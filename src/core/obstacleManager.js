@@ -149,11 +149,21 @@ export class ObstacleManager {
 
     for (let i = this.obstacles.length - 1; i >= 0; i--) {
       const obstacle = this.obstacles[i];
-      
+      const dz = obstacle.position.z - playerPosition.z;
+
       // Check if obstacle is far behind the player
       if (obstacle.position.z < playerPosition.z - 10) {
         this.returnToPool(obstacle);
         this.obstacles.splice(i, 1);
+        continue;
+      }
+
+      // Distance-based culling: hide far-ahead obstacles to reduce draw calls
+      if (dz > 60) {
+        obstacle.isVisible = false;
+      } else if (dz > -10) {
+        // Show when within relevant range (ahead or slightly behind)
+        obstacle.isVisible = true;
       }
     }
   }

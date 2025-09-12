@@ -123,9 +123,19 @@ export class CoinManager {
 
     for (let i = this.coins.length - 1; i >= 0; i--) {
       const coin = this.coins[i];
+      const dz = coin.position.z - playerPosition.z;
+      
+      // Distance-based culling to reduce draw calls
+      if (dz > 80) {
+        coin.isVisible = false;
+      } else if (dz > -10) {
+        coin.isVisible = true;
+      }
       
       // Rotate coin
-      coin.rotation.z += this.coinRotationSpeed * deltaTime;
+      if (coin.isVisible) {
+        coin.rotation.z += this.coinRotationSpeed * deltaTime;
+      }
       
       // Check if coin is far behind the player
       if (coin.position.z < playerPosition.z - 10) {
