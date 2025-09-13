@@ -12,6 +12,8 @@ import { CoinManager } from './core/coinManager.js';
 import { WorldManager } from './core/worldManager.js';
 import { AssetManager } from './core/assetManager.js';
 import { UIManager } from './core/uiManager.js';
+import { getConfig } from './core/config.js';
+import { BlenderMCPManager } from './core/blenderMCPManager.js';
 import { InputHandler } from './utils/inputHandler.js';
 
 // Import styles
@@ -30,7 +32,9 @@ class TempleRunGame {
     this.assetManager = null;
     this.uiManager = null;
     this.inputHandler = null;
-    
+    this.config = null;
+    this.mcpManager = null;
+
     // Game state
     this.isPlaying = false;
     this.isPaused = false;
@@ -46,26 +50,40 @@ class TempleRunGame {
    */
   async init() {
     console.log('Initializing Temple Run Web Game...');
-    
+
     // Setup canvas
     this.setupCanvas();
-    
+
     // Initialize scene
     this.mainScene = new MainScene(this.canvas);
     this.scene = await this.mainScene.init();
-    
+
     // Initialize game systems
     await this.initializeSystems();
-    
+
     // Setup input
     this.setupInput();
-    
+
     // Setup UI callbacks
     this.setupUICallbacks();
-    
+
     // Initialize UI
     this.uiManager.init();
-    
+
+    // Load config and optionally connect to Blender MCP
+    this.config = getConfig();
+    this.mcpManager = new BlenderMCPManager(this.config);
+    this.mcpManager.on('status', (status) => {
+      if (this.config.debug) {
+        console.log('[Game] MCP status event:', status);
+      }
+    });
+    if (this.config.mcp.enabled && this.config.mcp.connectOnStart) {
+      this.mcpManager.connect().catch((err) => {
+        console.warn('[Game] MCP connect error:', err?.message || err);
+      });
+    }
+
     console.log('Game initialized successfully!');
   }
 
@@ -89,39 +107,39 @@ class TempleRunGame {
     // Initialize asset manager first
     this.assetManager = new AssetManager(this.scene);
     await this.assetManager.init();
-    
+
     // Initialize game loop
     this.gameLoop = new GameLoop(this.scene);
-    
+
     // Initialize player controller with improved model
     this.playerController = new PlayerController(this.scene);
     const playerMesh = this.assetManager.getAsset('player') || this.createPlayerPlaceholder();
     this.playerController.init(playerMesh);
-    
+
     // Initialize obstacle manager
     this.obstacleManager = new ObstacleManager(this.scene);
     this.obstacleManager.init();
-    
+
     // Initialize coin manager
     this.coinManager = new CoinManager(this.scene);
     this.coinManager.init();
-    
+
     // Initialize world manager with obstacle and coin managers
     this.worldManager = new WorldManager(this.scene, this.obstacleManager, this.coinManager);
     this.worldManager.init();
-    
+
     // Initialize UI manager
     this.uiManager = new UIManager();
-    
+
     // Initialize input handler
     this.inputHandler = new InputHandler();
     this.inputHandler.init();
-    
+
     // Register systems with game loop
     this.gameLoop.registerSystem(this.playerController);
     this.gameLoop.registerSystem(this.worldManager);
     this.gameLoop.registerSystem({
-      update: (deltaTime) => this.updateGame(deltaTime)
+      update: (deltaTime) => this.updateGame(deltaTime),
     });
   }
 
@@ -129,24 +147,20 @@ class TempleRunGame {
    * Create a placeholder player mesh
    */
   createPlayerPlaceholder() {
-    const player = BABYLON.MeshBuilder.CreateBox(
-      'player',
-      { size: 1 },
-      this.scene
-    );
-    
+    const player = BABYLON.MeshBuilder.CreateBox('player', { size: 1 }, this.scene);
+
     player.position.y = 0.5;
-    
+
     // Create player material
     const playerMaterial = new BABYLON.StandardMaterial('playerMat', this.scene);
     playerMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.6, 1);
     player.material = playerMaterial;
-    
+
     // Enable shadows
     if (this.mainScene.shadowGenerator) {
       this.mainScene.shadowGenerator.addShadowCaster(player);
     }
-    
+
     return player;
   }
 
@@ -175,22 +189,22 @@ class TempleRunGame {
    */
   startGame() {
     console.log('Starting game...');
-    
+
     this.isPlaying = true;
     this.isPaused = false;
     this.score = 0;
     this.distanceTraveled = 0;
     this.gameSpeed = 1.0;
-    
+
     // Reset all systems
     this.playerController.reset();
     this.obstacleManager.reset();
     this.coinManager.reset();
     this.worldManager.reset();
-    
+
     // Enable input
     this.inputHandler.enable();
-    
+
     // Start game loop
     this.gameLoop.start();
   }
@@ -208,9 +222,9 @@ class TempleRunGame {
    */
   togglePause() {
     if (!this.isPlaying) return;
-    
+
     this.isPaused = !this.isPaused;
-    
+
     if (this.isPaused) {
       this.gameLoop.pause();
       console.log('Game paused');
@@ -225,41 +239,41 @@ class TempleRunGame {
    */
   updateGame(deltaTime) {
     if (!this.isPlaying || this.isPaused) return;
-    
+
     // Update distance traveled
     this.distanceTraveled += this.playerController.forwardSpeed * deltaTime;
-    
+
     // Update score based on distance and coins
-    this.score = Math.floor(this.distanceTraveled) + (this.coinManager.getCollectedCoins() * 10);
-    
+    this.score = Math.floor(this.distanceTraveled) + this.coinManager.getCollectedCoins() * 10;
+
     // Update UI
     this.uiManager.updateScore(this.score);
     this.uiManager.updateDistance(this.distanceTraveled);
     this.uiManager.updateCoins(this.coinManager.getCollectedCoins());
-    
+
     // Check for coin collection (uses player position)
     const coinsCollected = this.coinManager.checkCollection(this.playerController.player);
     if (coinsCollected > 0) {
       console.log(`Collected ${coinsCollected} coins!`);
     }
-    
+
     // Check for collisions with obstacles using the collider mesh
     if (this.obstacleManager.checkCollision(this.playerController.collider)) {
       this.gameOver();
     }
-    
+
     // Update camera to follow player
     if (this.playerController.player) {
       this.mainScene.updateCameraFollow(this.playerController.player.position);
     }
-    
+
     // Gradually increase game speed
     this.increaseGameSpeed(deltaTime);
-    
+
     // World manager handles obstacle and coin spawning now
     const playerPos = this.playerController.player ? this.playerController.player.position : null;
     this.worldManager.update(deltaTime, playerPos);
-    
+
     // Still need to update obstacle and coin animations/cleanup
     this.obstacleManager.updateObstacles(playerPos);
     this.coinManager.updateCoins(deltaTime, playerPos);
@@ -272,7 +286,7 @@ class TempleRunGame {
     if (this.gameSpeed < this.maxSpeed) {
       this.gameSpeed += this.speedIncreaseRate * deltaTime;
       this.gameLoop.setGameSpeed(this.gameSpeed);
-      
+
       // Also increase player forward speed
       const newSpeed = 10 + (this.gameSpeed - 1) * 5;
       this.playerController.setForwardSpeed(newSpeed);
@@ -287,16 +301,16 @@ class TempleRunGame {
     console.log(`Final Score: ${this.score}`);
     console.log(`Distance: ${Math.floor(this.distanceTraveled)}m`);
     console.log(`Coins: ${this.coinManager.getCollectedCoins()}`);
-    
+
     this.isPlaying = false;
-    
+
     // Stop game systems
     this.gameLoop.stop();
     this.inputHandler.disable();
-    
+
     // Show game over UI
     this.uiManager.gameOver();
-    
+
     // Play death animation
     this.playerController.die();
   }
