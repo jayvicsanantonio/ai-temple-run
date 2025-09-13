@@ -8,24 +8,26 @@
   - Notes: Heartbeat + exponential backoff; runtime overrides via `window.__TEMPLE_RUN_CONFIG__`.
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 2. Implement Hyper3D character generation system
-  - [ ] 2.1 Create Hyper3DIntegration class with text-to-3D generation
-    - Implement generateCharacterFromText method with prompt handling
-    - Add support for bbox_condition parameter for character proportions
-    - Create job tracking system for active generation tasks
+- [x] 2. Implement Hyper3D character generation system
+  - [x] 2.1 Create Hyper3DIntegration class with text-to-3D generation
+    - Implemented `generateCharacterFromText` with prompt + bbox support
+    - Job tracking via internal map and events
+    - Implemented in: `src/core/hyper3dIntegration.js`
     - _Requirements: 1.1, 1.4_
 
-  - [ ] 2.2 Implement Hyper3D job polling and completion handling
-    - Create pollJobStatus method using subscription_key for MAIN_SITE mode
-    - Implement automatic polling with timeout and retry logic
-    - Add status tracking for "Done", "Failed", and "In Progress" states
+  - [x] 2.2 Implement Hyper3D job polling and completion handling
+    - Added `pollJobStatus` with subscription key headers in MAIN_SITE mode
+    - Automatic polling with timeout and status normalization
+    - Tracks "Done", "Failed", "In Progress"
     - _Requirements: 1.1, 1.4_
 
-  - [ ] 2.3 Create asset import system for completed Hyper3D models
-    - Implement importCompletedAsset method with proper object naming
-    - Add validation for successful import and asset integrity
-    - Create fallback handling for failed imports
+  - [x] 2.3 Create asset import system for completed Hyper3D models
+    - Added `importCompletedAsset` with proper naming and validation
+    - Fallback to procedural player placeholder on failure
     - _Requirements: 1.1, 1.5_
+  - [x] 2.4 Add simple UI hook for manual generation
+    - Debug prompt + button in HUD triggers generation/poll/import
+    - Integrates imported model by replacing player mesh
 
 - [ ] 3. Implement PolyHaven texture integration
   - [ ] 3.1 Create PolyHavenIntegration class for texture management

@@ -9,7 +9,7 @@ export class UIManager {
     this.coins = 0;
     this.distance = 0;
     this.highScore = this.loadHighScore();
-    
+
     // UI Elements
     this.elements = {
       startScreen: null,
@@ -21,9 +21,9 @@ export class UIManager {
       highScoreDisplay: null,
       finalScoreDisplay: null,
       playButton: null,
-      restartButton: null
+      restartButton: null,
     };
-    
+
     this.onPlayCallback = null;
     this.onRestartCallback = null;
   }
@@ -74,6 +74,11 @@ export class UIManager {
           <span class="hud-label">Distance</span>
           <span id="distance-display" class="hud-value">0m</span>
         </div>
+        <div class="hud-item hud-debug">
+          <input id="h3d-prompt" class="hud-input" placeholder="Hyper3D prompt" />
+          <button id="h3d-generate" class="ui-button small">Gen 3D</button>
+          <span id="h3d-status" class="hud-status"></span>
+        </div>
       </div>
     `;
     document.body.appendChild(gameUI);
@@ -118,6 +123,10 @@ export class UIManager {
     this.elements.finalScoreDisplay = document.getElementById('final-score');
     this.elements.playButton = document.getElementById('play-button');
     this.elements.restartButton = document.getElementById('restart-button');
+    // Debug elements
+    this.elements.h3dPrompt = document.getElementById('h3d-prompt');
+    this.elements.h3dGenerateBtn = document.getElementById('h3d-generate');
+    this.elements.h3dStatus = document.getElementById('h3d-status');
 
     // Update high score display
     this.elements.highScoreDisplay.textContent = this.highScore;
@@ -143,6 +152,19 @@ export class UIManager {
         this.onRestartCallback();
       }
     });
+
+    if (this.elements.h3dGenerateBtn) {
+      this.elements.h3dGenerateBtn.addEventListener('click', () => {
+        const prompt = this.elements.h3dPrompt ? this.elements.h3dPrompt.value : '';
+        if (this.onHyper3DGenerate) {
+          const updateStatus = (text) => {
+            if (this.elements.h3dStatus) this.elements.h3dStatus.textContent = text || '';
+          };
+          updateStatus('Starting...');
+          this.onHyper3DGenerate(prompt, updateStatus);
+        }
+      });
+    }
   }
 
   /**
@@ -180,7 +202,7 @@ export class UIManager {
    */
   showGameOverScreen() {
     this.elements.gameOverScreen.classList.remove('hidden');
-    
+
     // Update final scores
     document.getElementById('final-score').textContent = this.score;
     document.getElementById('final-coins').textContent = this.coins;
@@ -202,7 +224,7 @@ export class UIManager {
   updateScore(score) {
     this.score = score;
     this.elements.scoreDisplay.textContent = score;
-    
+
     // Update high score if necessary
     if (score > this.highScore) {
       this.highScore = score;
@@ -262,6 +284,14 @@ export class UIManager {
    */
   setOnRestartCallback(callback) {
     this.onRestartCallback = callback;
+  }
+
+  /**
+   * Set Hyper3D generate button callback
+   * @param {(prompt: string, updateStatus: (text:string)=>void) => void} callback
+   */
+  setOnHyper3DGenerateCallback(callback) {
+    this.onHyper3DGenerate = callback;
   }
 
   /**

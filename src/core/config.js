@@ -38,7 +38,17 @@ const defaultConfig = {
     mode: 'MAIN_SITE', // MAIN_SITE | LOCAL | MOCK
     baseUrl: 'https://api.hyper3d.local', // placeholder; override in runtime config
     subscriptionKey: '', // never commit real keys
+    subscriptionKeyHeader: 'x-subscription-key',
     defaultBboxCondition: null, // e.g., { x: 0.5, y: 1.8, z: 0.5 }
+    apiPaths: {
+      generate: '/v1/generate',
+      jobs: '/v1/jobs',
+      assetUrlField: 'glbUrl',
+    },
+    polling: {
+      intervalMs: 3000,
+      timeoutMs: 10 * 60 * 1000,
+    },
   },
 
   // PolyHaven integration settings (placeholders for future steps)

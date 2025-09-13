@@ -14,6 +14,7 @@ import { AssetManager } from './core/assetManager.js';
 import { UIManager } from './core/uiManager.js';
 import { getConfig } from './core/config.js';
 import { BlenderMCPManager } from './core/blenderMCPManager.js';
+import { Hyper3DIntegration } from './core/hyper3dIntegration.js';
 import { InputHandler } from './utils/inputHandler.js';
 
 // Import styles
@@ -34,6 +35,7 @@ class TempleRunGame {
     this.inputHandler = null;
     this.config = null;
     this.mcpManager = null;
+    this.hyper3d = null;
 
     // Game state
     this.isPlaying = false;
@@ -83,6 +85,9 @@ class TempleRunGame {
         console.warn('[Game] MCP connect error:', err?.message || err);
       });
     }
+
+    // Initialize Hyper3D integration (no automatic generation here)
+    this.hyper3d = new Hyper3DIntegration(this.assetManager, this.mcpManager, this.config);
 
     console.log('Game initialized successfully!');
   }
@@ -182,6 +187,32 @@ class TempleRunGame {
   setupUICallbacks() {
     this.uiManager.setOnPlayCallback(() => this.startGame());
     this.uiManager.setOnRestartCallback(() => this.restartGame());
+    // Hyper3D debug generate button
+    this.uiManager.setOnHyper3DGenerateCallback(async (prompt, updateStatus) => {
+      try {
+        const text = prompt && prompt.trim().length > 0 ? prompt.trim() : 'stylized runner';
+        updateStatus('Submitting job...');
+        const { id } = await this.hyper3d.generateCharacterFromText(text, {
+          bboxCondition: this.config?.hyper3d?.defaultBboxCondition || null,
+        });
+        updateStatus('Polling...');
+        const { status } = await this.hyper3d.pollJobStatus(id);
+        updateStatus(status);
+        if (status === 'Done') {
+          updateStatus('Importing...');
+          const mesh = await this.hyper3d.importCompletedAsset(id, { name: 'player_h3d' });
+          if (mesh) {
+            this.playerController.setPlayerMesh(mesh);
+            updateStatus('Ready');
+          } else {
+            updateStatus('Import failed');
+          }
+        }
+      } catch (err) {
+        console.warn('Hyper3D generate error:', err);
+        updateStatus('Error');
+      }
+    });
   }
 
   /**
