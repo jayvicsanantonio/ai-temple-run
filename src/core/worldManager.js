@@ -105,8 +105,13 @@ export class WorldManager {
     const pathwayModel = this.assetManager?.getModel(modelName);
 
     if (pathwayModel) {
-      // Use the GLB temple pathway model
-      const path = pathwayModel.createInstance(`${name}_path`);
+      // Use the GLB temple pathway model with LOD
+      const path = this.assetManager.createLODInstance(
+        modelName,
+        `${name}_path`,
+        new BABYLON.Vector3(0, 0, 0)
+      ) || pathwayModel.createInstance(`${name}_path`);
+
       path.scaling = new BABYLON.Vector3(1, 1, 1);
       path.position.y = 0;
       path.receiveShadows = true;
@@ -207,14 +212,27 @@ export class WorldManager {
     const wallModel = this.assetManager?.getModel('wallSegment');
 
     if (pillarModel) {
-      // Add stone pillars on sides
-      const leftPillar = pillarModel.createInstance(`${name}_leftPillar`);
+      // Add stone pillars on sides with LOD
+      const leftPosition = new BABYLON.Vector3(-this.tileWidth / 2 - 1, 0, 0);
+      const rightPosition = new BABYLON.Vector3(this.tileWidth / 2 + 1, 0, 0);
+
+      const leftPillar = this.assetManager.createLODInstance(
+        'stonePillar',
+        `${name}_leftPillar`,
+        leftPosition
+      ) || pillarModel.createInstance(`${name}_leftPillar`);
+
       leftPillar.position.x = -this.tileWidth / 2 - 1;
       leftPillar.position.y = 0;
       leftPillar.scaling = new BABYLON.Vector3(0.8, 1, 0.8);
       leftPillar.parent = tileContainer;
 
-      const rightPillar = pillarModel.createInstance(`${name}_rightPillar`);
+      const rightPillar = this.assetManager.createLODInstance(
+        'stonePillar',
+        `${name}_rightPillar`,
+        rightPosition
+      ) || pillarModel.createInstance(`${name}_rightPillar`);
+
       rightPillar.position.x = this.tileWidth / 2 + 1;
       rightPillar.position.y = 0;
       rightPillar.scaling = new BABYLON.Vector3(0.8, 1, 0.8);
@@ -254,11 +272,20 @@ export class WorldManager {
       const decorationModel = this.assetManager?.getModel(randomDecoration);
 
       if (decorationModel) {
-        // Add temple decoration on one side
-        const decoration = decorationModel.createInstance(`decoration_${zPosition}_${randomDecoration}`);
-        decoration.position.x = Math.random() > 0.5 ? -3.5 : 3.5;
+        // Add temple decoration on one side with LOD
+        const decorationX = Math.random() > 0.5 ? -3.5 : 3.5;
+        const decorationZ = zPosition + (Math.random() * 10 - 5);
+        const decorationPos = new BABYLON.Vector3(decorationX, 0, decorationZ);
+
+        const decoration = this.assetManager.createLODInstance(
+          randomDecoration,
+          `decoration_${zPosition}_${randomDecoration}`,
+          decorationPos
+        ) || decorationModel.createInstance(`decoration_${zPosition}_${randomDecoration}`);
+
+        decoration.position.x = decorationX;
         decoration.position.y = 0;
-        decoration.position.z = zPosition + (Math.random() * 10 - 5);
+        decoration.position.z = decorationZ;
         decoration.scaling = new BABYLON.Vector3(0.6, 0.6, 0.6);
         tile.tileData.decorations.push(decoration);
       }
@@ -270,8 +297,13 @@ export class WorldManager {
    */
   update(deltaTime, playerPosition) {
     if (!playerPosition) return;
-    
+
     const playerZ = playerPosition.z;
+
+    // Update LOD system based on player position
+    if (this.assetManager) {
+      this.assetManager.updateLOD(playerPosition);
+    }
     
     // Spawn new tiles ahead
     while (this.lastTileZ < playerZ + (this.tilesAhead * this.tileLength)) {
@@ -314,8 +346,11 @@ export class WorldManager {
     tile.setEnabled(false);
     tile.tileData.active = false;
     
-    // Clean up decorations
+    // Clean up decorations and remove from LOD tracking
     for (const decoration of tile.tileData.decorations) {
+      if (this.assetManager) {
+        this.assetManager.removeLODInstance(decoration);
+      }
       decoration.dispose();
     }
     tile.tileData.decorations = [];
