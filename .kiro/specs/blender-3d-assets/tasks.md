@@ -14,7 +14,7 @@
   - Use text prompts: "fallen temple log", "weathered stone block", "ancient spike trap"
   - Export as GLB to `/public/assets/models/obstacles/`
 
-- [ ] 4. Generate environmental decorations using Hyper3D
+- [x] 4. Generate environmental decorations using Hyper3D
   - Use text prompts: "temple tree with vines", "moss covered stone", "ancient carved symbol"
   - Export as GLB to `/public/assets/models/decorations/`
 
