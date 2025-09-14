@@ -21,6 +21,7 @@ export class ParticleEffects {
     this.createDustParticleSystem();
     this.createCollisionParticleSystem();
     this.createSparkleParticleSystem();
+    this.createWaterSplashParticleSystem();
   }
 
   /**
@@ -179,6 +180,50 @@ export class ParticleEffects {
     
     particleSystem.stop();
     this.sparkleParticleSystem = particleSystem;
+  }
+
+  /**
+   * Create shallow water splash effect
+   */
+  createWaterSplashParticleSystem() {
+    const ps = new BABYLON.ParticleSystem('waterSplash', 200, this.scene);
+    ps.particleTexture = this.createParticleTexture('smoke');
+    ps.emitter = new BABYLON.Vector3(0, 0, 0);
+    ps.minEmitBox = new BABYLON.Vector3(-0.3, 0, -0.3);
+    ps.maxEmitBox = new BABYLON.Vector3(0.3, 0.1, 0.3);
+
+    // Colors: greenish water with transparency
+    ps.color1 = new BABYLON.Color4(0.4, 0.8, 0.6, 0.6);
+    ps.color2 = new BABYLON.Color4(0.5, 0.9, 0.7, 0.4);
+    ps.colorDead = new BABYLON.Color4(0.4, 0.8, 0.6, 0);
+
+    ps.minSize = 0.08;
+    ps.maxSize = 0.2;
+    ps.minLifeTime = 0.25;
+    ps.maxLifeTime = 0.6;
+    ps.emitRate = 600;
+    ps.blendMode = BABYLON.ParticleSystem.BLENDMODE_STANDARD;
+
+    ps.minEmitPower = 1.2;
+    ps.maxEmitPower = 2.2;
+    ps.updateSpeed = 0.01;
+    ps.gravity = new BABYLON.Vector3(0, -6, 0);
+    ps.direction1 = new BABYLON.Vector3(-0.8, 1.6, -0.8);
+    ps.direction2 = new BABYLON.Vector3(0.8, 2.0, 0.8);
+
+    ps.stop();
+    this.waterSplash = ps;
+  }
+
+  /**
+   * Play a short water splash burst at a position
+   */
+  playWaterSplash(position) {
+    if (!this.waterSplash) return;
+    this.waterSplash.emitter = position.clone();
+    this.waterSplash.emitter.y = 0.0;
+    this.waterSplash.start();
+    setTimeout(() => this.waterSplash?.stop?.(), 180);
   }
 
   /**

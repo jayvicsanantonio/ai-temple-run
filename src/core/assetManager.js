@@ -89,6 +89,10 @@ export class AssetManager {
       { path: 'decorations/temple_tree_with_vines.glb', name: 'tree' },
       { path: 'decorations/moss_covered_stone.glb', name: 'mossStone' },
       { path: 'decorations/ancient_carved_symbol.glb', name: 'carvedSymbol' },
+      { path: 'decorations/vine_wrapped_arch.glb', name: 'vineArch' },
+      { path: 'decorations/totem_head.glb', name: 'totemHead' },
+      { path: 'decorations/broken_obelisk.glb', name: 'brokenObelisk' },
+      { path: 'decorations/serpent_idol.glb', name: 'serpentIdol' },
 
       // Additional temple assets
       { path: 'temple_coin_collectible.glb', name: 'coin' },

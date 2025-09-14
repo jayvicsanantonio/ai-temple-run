@@ -43,6 +43,13 @@ export class WorldManager {
     // Materials
     this.tileMaterials = [];
     this.decorationMeshes = [];
+
+    // Swamp biome controls
+    this.swampChance = 0.2; // chance a tile becomes a swamp/bridge segment
+    this.maxSwampStreak = 2; // limit consecutive swamp tiles
+    this._swampStreak = 0;
+    this._lastIsSwampUnderPlayer = null;
+    this._envDefaults = null; // cached default env values
   }
 
   /**
@@ -176,6 +183,8 @@ export class WorldManager {
       coins: [],
       decorations: [],
       tileType: tileType,
+      isSwamp: false,
+      basePath: basePath,
     };
 
     return tileContainer;
@@ -241,9 +250,31 @@ export class WorldManager {
     const tile = this.getFromPool();
 
     if (tile) {
+      // Swamp selection with constraints
+      let isSwamp = false;
+      if (zPosition > 40) {
+        const candidate = Math.random() < this.swampChance;
+        if (candidate) {
+          if (this._swampStreak < this.maxSwampStreak) {
+            isSwamp = true;
+            this._swampStreak++;
+          }
+        } else {
+          this._swampStreak = 0;
+        }
+      } else {
+        this._swampStreak = 0;
+      }
+
       tile.position.z = zPosition;
       tile.setEnabled(true);
       tile.tileData.active = true;
+      tile.tileData.isSwamp = isSwamp;
+
+      // Apply biome styling
+      if (isSwamp) {
+        this.applySwampStyling(tile);
+      }
 
       // Add obstacles and coins based on difficulty
       if (zPosition > 40) {
@@ -253,6 +284,71 @@ export class WorldManager {
 
       this.tiles.push(tile);
       this.lastTileZ = zPosition;
+    }
+  }
+
+  /**
+   * Apply swamp/bridge styling to a tile: hide stone base and place a bridge platform.
+   */
+  applySwampStyling(tile) {
+    if (!tile || !tile.tileData) return;
+    const { basePath } = tile.tileData;
+    if (basePath) {
+      // Either hide base or make it muddy and submerged
+      const mud = this.assetManager?.getMaterial('brown_mud');
+      if (mud) {
+        basePath.material = mud;
+      }
+      basePath.position.y = -0.12; // sink slightly towards the water plane
+      basePath.visibility = 0.3; // faintly visible under water
+    }
+
+    // Place a bridge walkway down the middle using the bridgePlatform GLB if available
+    const bridgeModel = this.assetManager?.getModel('bridgePlatform');
+    if (bridgeModel) {
+      const bridge =
+        this.assetManager.createLODInstance(
+          'bridgePlatform',
+          `${tile.name}_bridge`,
+          new BABYLON.Vector3(0, 0, tile.position.z)
+        ) || bridgeModel.createInstance(`${tile.name}_bridge`);
+      
+      // Parent to tile
+      bridge.parent = tile;
+      // Center and stretch along tile depth
+      bridge.position.set(0, 0, 0);
+      bridge.scaling = new BABYLON.Vector3(1.0, 1.0, 1.6);
+
+      // Apply stone material if available
+      const stoneMaterial = this.assetManager?.getMaterial('castle_wall_slates');
+      if (stoneMaterial) {
+        const applyToMeshOrSource = (m) => {
+          const target = m && m.sourceMesh ? m.sourceMesh : m;
+          if (target && target.material !== undefined) target.material = stoneMaterial;
+        };
+        if (typeof bridge.getChildMeshes === 'function') {
+          for (const m of bridge.getChildMeshes(false)) applyToMeshOrSource(m);
+        } else {
+          applyToMeshOrSource(bridge);
+        }
+      }
+      tile.tileData.decorations.push(bridge);
+    }
+
+    // Gate the bridge with a vine-wrapped arch at the front of the tile for a visual cue
+    const archModel = this.assetManager?.getModel('vineArch');
+    if (archModel) {
+      const arch =
+        this.assetManager.createLODInstance(
+          'vineArch',
+          `${tile.name}_swampArchFront`,
+          new BABYLON.Vector3(0, 0, tile.position.z)
+        ) || archModel.createInstance(`${tile.name}_swampArchFront`);
+      arch.parent = tile;
+      // Place near the front edge of the tile
+      arch.position.set(0, 0, -this.tileLength * 0.45);
+      arch.scaling = new BABYLON.Vector3(1.0, 1.0, 1.0);
+      tile.tileData.decorations.push(arch);
     }
   }
 
@@ -294,21 +390,43 @@ export class WorldManager {
   addDecorations(tile, zPosition) {
     // Random chance to add temple decorations
     if (Math.random() < 0.4) {
-      const decorationModels = [
-        'tree',
-        'mossStone',
-        'carvedSymbol',
-        'crystalFormation',
-        'fountain',
-        'vines',
-      ];
+      const isSwamp = !!tile?.tileData?.isSwamp;
+      const decorationModels = isSwamp
+        ? [
+            // Swamp-biased set (no fountains/crystals)
+            'tree',
+            'mossStone',
+            'vines',
+            'stonePillar',
+            'templeWall',
+            'bridgePlatform',
+            'vineArch',
+            'totemHead',
+            'brokenObelisk',
+            'serpentIdol',
+          ]
+        : [
+            'tree',
+            'mossStone',
+            'carvedSymbol',
+            'crystalFormation',
+            'fountain',
+            'vines',
+            'stonePillar',
+            'templeWall',
+            'bridgePlatform',
+            'vineArch',
+            'totemHead',
+            'brokenObelisk',
+            'serpentIdol',
+          ];
       const randomDecoration =
         decorationModels[Math.floor(Math.random() * decorationModels.length)];
       const decorationModel = this.assetManager?.getModel(randomDecoration);
 
       if (decorationModel) {
         // Add temple decoration on one side with LOD
-        const decorationX = Math.random() > 0.5 ? -3.5 : 3.5;
+        let decorationX = Math.random() > 0.5 ? -3.5 : 3.5;
         const decorationZ = zPosition + (Math.random() * 10 - 5);
         const decorationPos = new BABYLON.Vector3(decorationX, 0, decorationZ);
 
@@ -319,6 +437,10 @@ export class WorldManager {
             decorationPos
           ) || decorationModel.createInstance(`decoration_${zPosition}_${randomDecoration}`);
 
+        // Place arches in the center as gateway accents
+        if (randomDecoration === 'vineArch') {
+          decorationX = 0;
+        }
         decoration.position.x = decorationX;
         decoration.position.y = 0;
         decoration.position.z = decorationZ;
@@ -329,6 +451,20 @@ export class WorldManager {
           scale = 0.8;
         } else if (randomDecoration === 'vines') {
           scale = 0.4;
+        } else if (randomDecoration === 'stonePillar') {
+          scale = 0.9;
+        } else if (randomDecoration === 'templeWall') {
+          scale = 0.8;
+        } else if (randomDecoration === 'bridgePlatform') {
+          scale = 0.7;
+        } else if (randomDecoration === 'vineArch') {
+          scale = 1.0;
+        } else if (randomDecoration === 'totemHead') {
+          scale = 0.9;
+        } else if (randomDecoration === 'brokenObelisk') {
+          scale = 1.0;
+        } else if (randomDecoration === 'serpentIdol') {
+          scale = 0.95;
         }
         decoration.scaling = new BABYLON.Vector3(scale, scale, scale);
 
@@ -344,6 +480,14 @@ export class WorldManager {
     if (!playerPosition) return;
 
     const playerZ = playerPosition.z;
+
+    // Biome-aware environment tweaks (fog and lighting) based on current tile
+    const tile = this.getTileAtZ(playerZ);
+    const isSwampHere = !!tile?.tileData?.isSwamp;
+    if (this._lastIsSwampUnderPlayer !== isSwampHere) {
+      this._lastIsSwampUnderPlayer = isSwampHere;
+      this.applyBiomeEnvironment(isSwampHere);
+    }
 
     // Update LOD system based on player position
     if (this.assetManager) {
@@ -366,6 +510,74 @@ export class WorldManager {
 
     // Update difficulty over time
     this.updateDifficulty(deltaTime);
+  }
+
+  /**
+   * Return the active tile at world-space Z
+   */
+  getTileAtZ(z) {
+    for (const t of this.tiles) {
+      const z0 = t.position.z - this.tileLength * 0.5;
+      const z1 = t.position.z + this.tileLength * 0.5;
+      if (z >= z0 && z < z1) return t;
+    }
+    return null;
+  }
+
+  /**
+   * Convenience: is there swamp under this world-space Z?
+   */
+  isSwampAtZ(z) {
+    const t = this.getTileAtZ(z);
+    return !!t?.tileData?.isSwamp;
+  }
+
+  /**
+   * Adjust fog and lighting when entering/exiting swamp biome
+   */
+  applyBiomeEnvironment(isSwamp) {
+    // Cache defaults on first call
+    if (!this._envDefaults) {
+      const dir = this.scene.getLightByName('dirLight');
+      const hemi = this.scene.getLightByName('hemiLight');
+      this._envDefaults = {
+        fogDensity: this.scene.fogDensity,
+        fogColor: this.scene.fogColor.clone(),
+        dirIntensity: dir ? dir.intensity : 0,
+        dirDiffuse: dir ? dir.diffuse.clone() : null,
+        hemiIntensity: hemi ? hemi.intensity : 0,
+        hemiDiffuse: hemi ? hemi.diffuse.clone() : null,
+      };
+    }
+
+    const dir = this.scene.getLightByName('dirLight');
+    const hemi = this.scene.getLightByName('hemiLight');
+
+    if (isSwamp) {
+      // Denser, cooler fog in swamp
+      this.scene.fogDensity = Math.min(0.028, this._envDefaults.fogDensity * 1.6 + 0.01);
+      this.scene.fogColor = new BABYLON.Color3(0.48, 0.60, 0.52);
+      if (dir) {
+        dir.intensity = Math.max(0.45, this._envDefaults.dirIntensity * 0.8);
+        dir.diffuse = new BABYLON.Color3(0.95, 0.88, 0.76);
+      }
+      if (hemi) {
+        hemi.intensity = Math.max(0.55, this._envDefaults.hemiIntensity * 0.85);
+        hemi.diffuse = new BABYLON.Color3(0.90, 0.98, 0.90);
+      }
+    } else {
+      // Restore defaults when leaving swamp
+      this.scene.fogDensity = this._envDefaults.fogDensity;
+      this.scene.fogColor = this._envDefaults.fogColor.clone();
+      if (dir) {
+        dir.intensity = this._envDefaults.dirIntensity;
+        if (this._envDefaults.dirDiffuse) dir.diffuse = this._envDefaults.dirDiffuse.clone();
+      }
+      if (hemi) {
+        hemi.intensity = this._envDefaults.hemiIntensity;
+        if (this._envDefaults.hemiDiffuse) hemi.diffuse = this._envDefaults.hemiDiffuse.clone();
+      }
+    }
   }
 
   /**

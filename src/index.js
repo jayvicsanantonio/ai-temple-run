@@ -15,6 +15,9 @@ import { UIManager } from './core/uiManager.js';
 import { InputHandler } from './utils/inputHandler.js';
 import { PerformanceMonitor } from './utils/performanceMonitor.js';
 import { PerformanceTest } from './utils/performanceTest.js';
+import { DebugVisualization } from './utils/debugVisualization.js';
+import { AssetValidator } from './utils/assetValidator.js';
+import { ParticleEffects } from './core/particleEffects.js';
 
 // Import styles
 import '../style.css';
@@ -34,7 +37,12 @@ class TempleRunGame {
     this.inputHandler = null;
     this.performanceMonitor = null;
     this.performanceTest = null;
+    this.debugVisualization = null;
+    this.assetValidator = null;
     this.debugMode = false;
+    this.particleEffects = null;
+    this._wasJumping = false;
+    this._wasSliding = false;
 
     // Game state
     this.isPlaying = false;
@@ -135,6 +143,10 @@ class TempleRunGame {
     this.coinManager = new CoinManager(this.scene, this.assetManager);
     this.coinManager.init();
 
+    // Initialize particle effects
+    this.particleEffects = new ParticleEffects(this.scene);
+    this.particleEffects.init();
+
     // Initialize world manager with obstacle and coin managers
     this.worldManager = new WorldManager(
       this.scene,
@@ -147,12 +159,34 @@ class TempleRunGame {
     // Initialize UI manager
     this.uiManager = new UIManager();
 
+    // Show asset health in debug mode
+    if (this.debugMode && this.assetManager) {
+      const health = this.assetManager.getAssetHealth();
+      console.log(`🎨 Asset Health: ${health.status} (${health.loadedAssets}/${health.totalAssets} loaded, ${Math.round(health.healthPercentage)}%)`);
+
+      // Start runtime asset validation
+      if (this.assetValidator) {
+        this.assetValidator.startRuntimeValidation();
+      }
+    }
+
     // Initialize input handler
     this.inputHandler = new InputHandler();
     this.inputHandler.init();
 
     // Initialize performance test utility
     this.performanceTest = new PerformanceTest(this);
+
+    // Initialize enhanced debug visualization
+    this.debugVisualization = new DebugVisualization(this.scene, this);
+    this.debugVisualization.init();
+
+    // Initialize asset validator
+    this.assetValidator = new AssetValidator(this.assetManager);
+    if (this.debugMode) {
+      // Run comprehensive validation in debug mode
+      setTimeout(() => this.validateAssets(), 2000);
+    }
 
     // Register systems with game loop
     this.gameLoop.registerSystem(this.playerController);
@@ -194,6 +228,17 @@ class TempleRunGame {
     this.inputHandler.setOnSlide(() => this.playerController.slide());
     this.inputHandler.setOnPause(() => this.togglePause());
     this.inputHandler.setOnToggleColliders(() => this.toggleColliders());
+
+    // Add debug visualization and validation toggles
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'F3' && this.debugVisualization) {
+        this.debugVisualization.toggle();
+      } else if (e.key === 'F5' && this.assetValidator) {
+        this.validateAssets();
+      } else if (e.key === 'F6' && this.assetValidator) {
+        this.assetValidator.exportValidationReport();
+      }
+    });
   }
 
   /**
@@ -286,7 +331,7 @@ class TempleRunGame {
       this.distanceTraveled > 5 &&
       this.obstacleManager.checkCollision(this.playerController.collider)
     ) {
-      this.gameOver();
+      this.debugMode ? this.gameOverEnhanced() : this.gameOver();
     }
 
     // Update camera to follow player
@@ -301,16 +346,47 @@ class TempleRunGame {
     const playerPos = this.playerController.player ? this.playerController.player.position : null;
     this.worldManager.update(deltaTime, playerPos);
 
+    // Splash effects when interacting with swamp tiles
+    if (playerPos && this.particleEffects) {
+      const isSwamp = this.worldManager.isSwampAtZ(playerPos.z);
+      const nowJumping = this.playerController.isJumping;
+      const nowSliding = this.playerController.isSliding;
+      // On landing (jumping -> not jumping)
+      if (this._wasJumping && !nowJumping && isSwamp) {
+        this.particleEffects.playWaterSplash(playerPos);
+      }
+      // On slide start
+      if (!this._wasSliding && nowSliding && isSwamp) {
+        this.particleEffects.playWaterSplash(playerPos);
+      }
+      this._wasJumping = nowJumping;
+      this._wasSliding = nowSliding;
+    }
+
+    // Update debug visualization
+    if (this.debugVisualization && this.debugVisualization.enabled) {
+      this.debugVisualization.update();
+    }
+
     // Log LOD statistics periodically
     if (this.frameCount % 300 === 0 && this.assetManager) {
       // Every 5 seconds at 60fps
       const lodStats = this.assetManager.getLODStats();
       this.performanceMonitor.logLODStats(lodStats);
+
+      if (this.debugMode) {
+        console.log('📊 LOD Stats:', lodStats);
+      }
     }
 
     // Log performance snapshot every 10 seconds
     if (this.frameCount % 600 === 0) {
       this.performanceMonitor.logSnapshot();
+
+      if (this.debugMode && this.assetManager) {
+        const health = this.assetManager.getAssetHealth();
+        console.log('💾 Asset Health:', health);
+      }
     }
 
     this.frameCount = this.frameCount || 0;
@@ -372,7 +448,13 @@ class TempleRunGame {
     if (this.obstacleManager && this.obstacleManager.setDebugColliders) {
       this.obstacleManager.setDebugColliders(this._debugColliders);
     }
-    console.log(`Collider debug: ${this._debugColliders ? 'ON' : 'OFF'}`);
+    console.log(`🔍 Collider debug: ${this._debugColliders ? 'ON' : 'OFF'}`);
+
+    // Also toggle asset manager debug features
+    if (this.assetManager) {
+      const health = this.assetManager.getAssetHealth();
+      console.log(`🎨 Current Asset Health: ${health.status} - ${health.loadedAssets}/${health.totalAssets} loaded`);
+    }
   }
 
   /**
@@ -433,6 +515,69 @@ class TempleRunGame {
           overlay.parentNode.removeChild(overlay);
         }
       }, 10000);
+    }
+  }
+
+  /**
+   * Validate game assets
+   */
+  async validateAssets() {
+    if (!this.assetValidator) {
+      console.warn('Asset validator not initialized');
+      return;
+    }
+
+    try {
+      const report = await this.assetValidator.validateAllAssets();
+      console.log('📊 Asset Validation Report:', report.summary);
+
+      if (report.recommendations.length > 0) {
+        console.log('💡 Recommendations:');
+        report.recommendations.forEach((rec, i) => {
+          console.log(`${i + 1}. [${rec.priority.toUpperCase()}] ${rec.issue}: ${rec.suggestion}`);
+        });
+      }
+
+      return report;
+    } catch (error) {
+      console.error('Asset validation failed:', error);
+    }
+  }
+
+  /**
+   * Get comprehensive game statistics for debugging
+   */
+  getGameStats() {
+    return {
+      game: {
+        isPlaying: this.isPlaying,
+        isPaused: this.isPaused,
+        score: this.score,
+        distanceTraveled: this.distanceTraveled,
+        gameSpeed: this.gameSpeed
+      },
+      assets: this.assetManager ? this.assetManager.getAssetHealth() : null,
+      lod: this.assetManager ? this.assetManager.getLODStats() : null,
+      obstacles: this.obstacleManager ? this.obstacleManager.getPerformanceStats?.() : null,
+      performance: this.performanceMonitor ? this.performanceMonitor.getStats() : null
+    };
+  }
+
+  /**
+   * Enhanced game over with debug information
+   */
+  gameOverEnhanced() {
+    this.gameOver();
+
+    if (this.debugMode) {
+      console.log('🎮 Game Over Debug Stats:', this.getGameStats());
+
+      // Export debug information if available
+      if (this.debugVisualization) {
+        setTimeout(() => {
+          this.debugVisualization.exportDebugInfo();
+        }, 1000);
+      }
     }
   }
 }
