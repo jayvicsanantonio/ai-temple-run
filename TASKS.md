@@ -85,17 +85,17 @@
     - Ready to extend with skeletal ragdoll when rigged assets arrive
     - _Requirements: 3.5, 4.4_
 
-- [ ] 7. Implement LOD (Level of Detail) system
-  - [ ] 7.1 Create AssetOptimizer class with LOD management
-    - Implement automatic LOD level generation with mesh decimation
-    - Add distance-based LOD switching for performance optimization
-    - Create quality preservation algorithms for visual consistency
+- [x] 7. Implement LOD (Level of Detail) system
+  - [x] 7.1 Create AssetOptimizer class with LOD management
+    - Added `AssetOptimizer` with Babylon simplifier support and fallback material degradation
+    - Distance-based LOD switching via `addLODLevel` and simplification settings
+    - Implemented in: `src/core/assetOptimizer.js`; integrated for player and obstacles
     - _Requirements: 2.5, 6.1, 6.4_
 
-  - [ ] 7.2 Implement performance monitoring and optimization
-    - Add frame rate monitoring with automatic LOD adjustment
-    - Implement memory usage tracking for textures and meshes
-    - Create performance profiling tools for physics simulation overhead
+  - [x] 7.2 Implement performance monitoring and optimization
+    - Added `PerformanceMonitor` tracking FPS, physics update time, and texture memory guess
+    - Automatic LOD distance scaling to maintain FPS window
+    - Implemented in: `src/core/performanceMonitor.js`; wired into game loop
     - _Requirements: 6.1, 6.3, 6.4_
 
 - [ ] 8. Create comprehensive asset management system

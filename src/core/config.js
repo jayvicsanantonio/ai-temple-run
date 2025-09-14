@@ -91,6 +91,23 @@ const defaultConfig = {
     jumpImpulse: 9,
     friction: 8,
   },
+
+  // LOD settings
+  lod: {
+    distances: [25, 60],
+    ratios: [0.6, 0.3],
+    useSimplifier: true,
+  },
+
+  // Performance monitor settings
+  performance: {
+    targetFps: 60,
+    lowerFps: 45,
+    upperFps: 75,
+    adjustStep: 0.05,
+    minScale: 0.6,
+    maxScale: 2.0,
+  },
 };
 
 function isPlainObject(value) {

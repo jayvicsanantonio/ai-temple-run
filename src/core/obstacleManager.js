@@ -21,6 +21,7 @@ export class ObstacleManager {
     // Lane positions matching player controller
     this.lanes = [-2, 0, 2];
     this.physics = null;
+    this.optimizer = null;
   }
 
   /**
@@ -32,6 +33,10 @@ export class ObstacleManager {
 
   setPhysicsManager(physics) {
     this.physics = physics;
+  }
+
+  setAssetOptimizer(optimizer) {
+    this.optimizer = optimizer;
   }
 
   /**
@@ -111,6 +116,9 @@ export class ObstacleManager {
 
       // Configure appearance based on type
       this.configureObstacleAppearance(obstacle, type);
+
+      // Apply LODs if available
+      if (this.optimizer) this.optimizer.tryApplyLODs(obstacle);
     }
   }
 

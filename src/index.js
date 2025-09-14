@@ -18,6 +18,8 @@ import { Hyper3DIntegration } from './core/hyper3dIntegration.js';
 import { PolyHavenIntegration } from './core/polyHavenIntegration.js';
 import { BlenderExportIntegration } from './core/blenderExportIntegration.js';
 import { PhysicsEngineManager } from './core/physicsEngineManager.js';
+import { AssetOptimizer } from './core/assetOptimizer.js';
+import { PerformanceMonitor } from './core/performanceMonitor.js';
 import { InputHandler } from './utils/inputHandler.js';
 
 // Import styles
@@ -42,6 +44,8 @@ class TempleRunGame {
     this.polyHaven = null;
     this.blenderExport = null;
     this.physics = null;
+    this.assetOptimizer = null;
+    this.performanceMonitor = null;
 
     // Game state
     this.isPlaying = false;
@@ -150,11 +154,19 @@ class TempleRunGame {
       });
     }
 
+    // Initialize LOD Asset Optimizer
+    this.assetOptimizer = new AssetOptimizer(this.scene, this.config);
+    // Apply LODs to player mesh
+    this.assetOptimizer.tryApplyLODs(this.playerController.player);
+
     // Initialize obstacle manager
     this.obstacleManager = new ObstacleManager(this.scene);
     this.obstacleManager.init();
     if (this.physics && this.obstacleManager.setPhysicsManager) {
       this.obstacleManager.setPhysicsManager(this.physics);
+    }
+    if (this.obstacleManager.setAssetOptimizer) {
+      this.obstacleManager.setAssetOptimizer(this.assetOptimizer);
     }
 
     // Initialize coin manager
@@ -178,11 +190,27 @@ class TempleRunGame {
     this.gameLoop.registerSystem({
       update: (deltaTime) => this.updateGame(deltaTime),
     });
-    // Physics step last
+    // Physics step
     this.gameLoop.registerSystem({
       update: (dt) => {
-        if (this.physics) this.physics.update(dt);
+        if (this.physics) {
+          const t0 = performance.now();
+          this.physics.update(dt);
+          const t1 = performance.now();
+          if (this.performanceMonitor) this.performanceMonitor.recordPhysicsTime(dt, t1 - t0);
+        }
       },
+    });
+
+    // Performance monitor (after systems constructed)
+    this.performanceMonitor = new PerformanceMonitor(
+      this.scene.getEngine(),
+      this.scene,
+      this.assetOptimizer,
+      this.config
+    );
+    this.gameLoop.registerSystem({
+      update: () => this.performanceMonitor.update(),
     });
   }
 
