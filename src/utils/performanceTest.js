@@ -2,6 +2,7 @@
  * Performance Testing Utility
  * Runs automated tests to validate performance optimizations
  */
+import * as BABYLON from 'babylonjs';
 
 export class PerformanceTest {
   constructor(game) {

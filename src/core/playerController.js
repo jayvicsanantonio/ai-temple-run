@@ -290,4 +290,18 @@ export class PlayerController {
   setForwardSpeed(speed) {
     this.forwardSpeed = Math.max(5, Math.min(30, speed));
   }
+
+  /**
+   * Toggle player collider debug visibility
+   */
+  setDebugCollider(enabled) {
+    if (!this.collider) return;
+    this.collider.isVisible = !!enabled;
+    if (enabled) {
+      const mat = new BABYLON.StandardMaterial('playerColliderMat', this.scene);
+      mat.diffuseColor = new BABYLON.Color3(0, 1, 1);
+      mat.alpha = 0.3;
+      this.collider.material = mat;
+    }
+  }
 }

@@ -12,7 +12,8 @@ export class InputHandler {
       onRight: null,
       onJump: null,
       onSlide: null,
-      onPause: null
+      onPause: null,
+      onToggleColliders: null
     };
     
     this.isEnabled = false;
@@ -64,6 +65,12 @@ export class InputHandler {
         case 'p':
           event.preventDefault();
           if (this.callbacks.onPause) this.callbacks.onPause();
+          break;
+
+        case 'c':
+          // Toggle collider debug visualization
+          event.preventDefault();
+          if (this.callbacks.onToggleColliders) this.callbacks.onToggleColliders();
           break;
       }
     });
@@ -182,6 +189,13 @@ export class InputHandler {
    */
   setOnPause(callback) {
     this.callbacks.onPause = callback;
+  }
+
+  /**
+   * Set callback to toggle collider debug
+   */
+  setOnToggleColliders(callback) {
+    this.callbacks.onToggleColliders = callback;
   }
 
   /**

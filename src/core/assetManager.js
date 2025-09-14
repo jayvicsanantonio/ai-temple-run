@@ -27,6 +27,11 @@ export class AssetManager {
       metal: 'textures/metal/',
       organic: 'textures/organic/'
     };
+
+    // LOD system defaults
+    this.lodEnabled = false;
+    this.lodInstances = new Map();
+    this.lodDistances = { high: 20, medium: 40, low: 60 };
   }
 
   /**
@@ -131,19 +136,40 @@ export class AssetManager {
       ]
     };
 
+    // Some folders contain files with a different base prefix than the folder name
+    const filePrefixAliases = {
+      stone: {
+        brick_wall: 'brick_wall_001'
+      },
+      organic: {
+        bark_brown: 'bark_brown_02',
+        brown_mud: 'brown_mud_03'
+      }
+    };
+
+    // Some materials may not include all texture types; override per material when needed
+    const defaultTypes = ['Diffuse', 'nor_dx', 'Rough', 'AO', 'Displacement'];
+    const typeOverrides = {
+      organic: {
+        fine_grained_wood: ['Diffuse', 'nor_dx', 'Rough', 'AO'] // no Displacement in assets
+      }
+    };
+
     const loadPromises = [];
 
     for (const [category, materials] of Object.entries(textureCategories)) {
       for (const material of materials) {
-        const materialPath = this.assetBasePath + this.texturePaths[category] + material + '/';
+        const folderPath = this.assetBasePath + this.texturePaths[category] + material + '/';
+        const prefixMap = filePrefixAliases[category] || {};
+        const filePrefix = prefixMap[material] || material;
 
-        // Define texture types to load
-        const textureTypes = ['Diffuse', 'nor_dx', 'Rough', 'AO', 'Displacement'];
+        const overrides = (typeOverrides[category] || {})[material];
+        const textureTypes = overrides || defaultTypes;
 
         for (const type of textureTypes) {
+          // Use the logical material name for keys, but the actual on-disk prefix for URLs
           const textureName = `${material}_${type}`;
-          const textureUrl = materialPath + textureName + '.jpg';
-
+          const textureUrl = folderPath + `${filePrefix}_${type}.jpg`;
           loadPromises.push(this.loadTexture(textureUrl, textureName, category));
         }
       }
@@ -479,18 +505,23 @@ export class AssetManager {
         const roughnessTex = this.textures.stone[`${materialName}_Rough`];
         const aoTex = this.textures.stone[`${materialName}_AO`];
 
-        if (diffuseTex) pbrMat.baseTexture = diffuseTex;
+        if (diffuseTex) pbrMat.albedoTexture = diffuseTex;
         if (normalTex) pbrMat.bumpTexture = normalTex;
-        if (roughnessTex) pbrMat.metallicTexture = roughnessTex;
-        if (aoTex) pbrMat.lightmapTexture = aoTex;
+        if (roughnessTex) {
+          // Use roughness from the green channel of the texture (grayscale map works fine)
+          pbrMat.metallicTexture = roughnessTex;
+          pbrMat.useRoughnessFromMetallicTextureGreen = true;
+          pbrMat.useMetallnessFromMetallicTextureBlue = false;
+        }
+        if (aoTex) pbrMat.ambientTexture = aoTex;
 
         // PBR properties for stone
-        pbrMat.baseColor = new BABYLON.Color3(1, 1, 1);
+        pbrMat.albedoColor = new BABYLON.Color3(1, 1, 1);
         pbrMat.roughness = 0.9;
         pbrMat.metallic = 0.0;
       } else {
         // Fallback colors
-        pbrMat.baseColor = new BABYLON.Color3(0.45, 0.4, 0.35);
+        pbrMat.albedoColor = new BABYLON.Color3(0.45, 0.4, 0.35);
         pbrMat.roughness = 0.8;
         pbrMat.metallic = 0.0;
       }
@@ -515,18 +546,23 @@ export class AssetManager {
         const roughnessTex = this.textures.metal[`${materialName}_Rough`];
         const aoTex = this.textures.metal[`${materialName}_AO`];
 
-        if (diffuseTex) pbrMat.baseTexture = diffuseTex;
+        if (diffuseTex) pbrMat.albedoTexture = diffuseTex;
         if (normalTex) pbrMat.bumpTexture = normalTex;
-        if (roughnessTex) pbrMat.metallicTexture = roughnessTex;
-        if (aoTex) pbrMat.lightmapTexture = aoTex;
+        if (roughnessTex) {
+          // Use roughness from green channel; do not read metallic from texture
+          pbrMat.metallicTexture = roughnessTex;
+          pbrMat.useRoughnessFromMetallicTextureGreen = true;
+          pbrMat.useMetallnessFromMetallicTextureBlue = false;
+        }
+        if (aoTex) pbrMat.ambientTexture = aoTex;
 
         // PBR properties for metal
-        pbrMat.baseColor = new BABYLON.Color3(1, 1, 1);
+        pbrMat.albedoColor = new BABYLON.Color3(1, 1, 1);
         pbrMat.roughness = materialName.includes('rust') ? 0.7 : 0.3;
-        pbrMat.metallic = materialName.includes('rust') ? 0.6 : 0.9;
+        pbrMat.metallic = materialName.includes('rust') ? 0.6 : 1.0;
       } else {
         // Fallback colors
-        pbrMat.baseColor = new BABYLON.Color3(0.6, 0.6, 0.6);
+        pbrMat.albedoColor = new BABYLON.Color3(0.6, 0.6, 0.6);
         pbrMat.roughness = 0.4;
         pbrMat.metallic = 0.8;
       }
@@ -551,23 +587,27 @@ export class AssetManager {
         const roughnessTex = this.textures.organic[`${materialName}_Rough`];
         const aoTex = this.textures.organic[`${materialName}_AO`];
 
-        if (diffuseTex) pbrMat.baseTexture = diffuseTex;
+        if (diffuseTex) pbrMat.albedoTexture = diffuseTex;
         if (normalTex) pbrMat.bumpTexture = normalTex;
-        if (roughnessTex) pbrMat.metallicTexture = roughnessTex;
-        if (aoTex) pbrMat.lightmapTexture = aoTex;
+        if (roughnessTex) {
+          pbrMat.metallicTexture = roughnessTex;
+          pbrMat.useRoughnessFromMetallicTextureGreen = true;
+          pbrMat.useMetallnessFromMetallicTextureBlue = false;
+        }
+        if (aoTex) pbrMat.ambientTexture = aoTex;
 
         // PBR properties for organic materials
-        pbrMat.baseColor = new BABYLON.Color3(1, 1, 1);
+        pbrMat.albedoColor = new BABYLON.Color3(1, 1, 1);
         pbrMat.roughness = 0.8;
         pbrMat.metallic = 0.0;
       } else {
         // Fallback colors
         if (materialName.includes('wood')) {
-          pbrMat.baseColor = new BABYLON.Color3(0.4, 0.25, 0.1);
+          pbrMat.albedoColor = new BABYLON.Color3(0.4, 0.25, 0.1);
         } else if (materialName.includes('mud')) {
-          pbrMat.baseColor = new BABYLON.Color3(0.3, 0.2, 0.15);
+          pbrMat.albedoColor = new BABYLON.Color3(0.3, 0.2, 0.15);
         } else {
-          pbrMat.baseColor = new BABYLON.Color3(0.35, 0.25, 0.15);
+          pbrMat.albedoColor = new BABYLON.Color3(0.35, 0.25, 0.15);
         }
         pbrMat.roughness = 0.9;
         pbrMat.metallic = 0.0;
@@ -629,6 +669,13 @@ export class AssetManager {
   }
 
   /**
+   * Get a model by name (returns original for instancing)
+   */
+  getModel(modelName) {
+    return this.assets[modelName] || null;
+  }
+
+  /**
    * Get a clone of an asset (prioritizes GLB models over procedural)
    */
   getAsset(assetName) {
@@ -638,6 +685,325 @@ export class AssetManager {
       return clone;
     }
     return null;
+  }
+
+  /**
+   * Create an optimized instance with LOD tracking
+   */
+  createLODInstance(modelName, instanceName, position) {
+    const model = this.getModel(modelName);
+    if (!model) return null;
+
+    // Helper to instance a single mesh that has geometry
+    const instanceSingleMesh = (mesh, name) => {
+      try {
+        if (mesh && typeof mesh.getTotalVertices === 'function' && mesh.getTotalVertices() > 0) {
+          return mesh.createInstance(name);
+        }
+      } catch (e) {
+        // Fall through to hierarchy instancing/clone path
+      }
+      return null;
+    };
+
+    // Helper to instance all child meshes under a root into a container
+    const instanceHierarchy = (root, name, containerPos = new BABYLON.Vector3(0, 0, 0)) => {
+      const container = new BABYLON.TransformNode(name, this.scene);
+
+      // Include root if it's a mesh with geometry
+      if (root && typeof root.getTotalVertices === 'function' && root.getTotalVertices() > 0) {
+        root.computeWorldMatrix(true);
+        const inst = root.createInstance(`${name}_root`);
+        // Compute local transform relative to container position (container has no rotation/scale)
+        const wm = root.getWorldMatrix();
+        const s = new BABYLON.Vector3();
+        const r = new BABYLON.Quaternion();
+        const t = new BABYLON.Vector3();
+        wm.decompose(s, r, t);
+        inst.parent = container;
+        inst.position.copyFrom(t.subtract(containerPos));
+        inst.rotationQuaternion = r;
+        inst.scaling.copyFrom(s);
+      }
+
+      // Instance all descendant meshes and preserve world transforms
+      const descendants = typeof root.getChildMeshes === 'function' ? root.getChildMeshes(false) : [];
+      for (const child of descendants) {
+        if (child && typeof child.getTotalVertices === 'function' && child.getTotalVertices() > 0) {
+          child.computeWorldMatrix(true);
+          const childInst = child.createInstance(`${name}_${child.name}`);
+          const wm = child.getWorldMatrix();
+          const s = new BABYLON.Vector3();
+          const r = new BABYLON.Quaternion();
+          const t = new BABYLON.Vector3();
+          wm.decompose(s, r, t);
+          childInst.parent = container;
+          childInst.position.copyFrom(t.subtract(containerPos));
+          childInst.rotationQuaternion = r;
+          childInst.scaling.copyFrom(s);
+        }
+      }
+
+      return container;
+    };
+
+    let instance = null;
+
+    // Try to instance directly if it's a mesh with geometry
+    instance = instanceSingleMesh(model, instanceName);
+
+    // If not possible (e.g., TransformNode or mesh without geometry), instance hierarchy
+    if (!instance) {
+      instance = instanceHierarchy(model, instanceName, position || new BABYLON.Vector3(0, 0, 0));
+    }
+
+    if (position && instance && instance.position) {
+      instance.position.copyFrom(position);
+    }
+
+    // Register for LOD management (track the returned top-level node)
+    if (instance && this.lodEnabled) {
+      if (!this.lodInstances) this.lodInstances = new Map();
+      if (!this.lodDistances) this.lodDistances = { high: 20, medium: 40, low: 60 };
+      this.lodInstances.set(instance, {
+        originalModel: model,
+        lodLevel: 'high',
+        isVisible: true,
+        position: (position && position.clone) ? position.clone() : (instance.position?.clone?.() || new BABYLON.Vector3(0, 0, 0))
+      });
+    }
+
+    return instance;
+  }
+
+  /**
+   * Recenters an instance container so its children's bounding center aligns with the container position.
+   * Useful to ensure visuals line up with gameplay colliders.
+   * @param {BABYLON.TransformNode} container
+   */
+  centerInstance(container) {
+    if (!container || typeof container.getChildMeshes !== 'function') return;
+    const meshes = container.getChildMeshes(false);
+    if (!meshes || meshes.length === 0) return;
+
+    // Compute world-space bounds across all child meshes
+    let min = new BABYLON.Vector3(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
+    let max = new BABYLON.Vector3(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
+    for (const m of meshes) {
+      if (!m || !m.getBoundingInfo) continue;
+      m.computeWorldMatrix(true);
+      const bb = m.getBoundingInfo().boundingBox;
+      const bmin = bb.minimumWorld;
+      const bmax = bb.maximumWorld;
+      min = BABYLON.Vector3.Minimize(min, bmin);
+      max = BABYLON.Vector3.Maximize(max, bmax);
+    }
+
+    const centerWorld = min.add(max).scale(0.5);
+    const containerWorld = (typeof container.getAbsolutePosition === 'function')
+      ? container.getAbsolutePosition()
+      : container.position;
+    const offset = centerWorld.subtract(containerWorld);
+
+    if (offset.lengthSquared() < 1e-6) return; // Already centered
+
+    for (const m of meshes) {
+      if (!m || !m.position) continue;
+      m.position.subtractInPlace(offset);
+    }
+  }
+
+  /**
+   * Update LOD system based on player position
+   */
+  updateLOD(playerPosition) {
+    if (!this.lodEnabled || !playerPosition) return;
+
+    this.currentPlayerPosition = playerPosition;
+
+    for (const [instance, lodData] of this.lodInstances) {
+      const worldPos = (typeof instance.getAbsolutePosition === 'function')
+        ? instance.getAbsolutePosition()
+        : instance.position;
+      const distance = BABYLON.Vector3.Distance(playerPosition, worldPos);
+
+      let newLodLevel;
+      let shouldBeVisible = true;
+
+      if (distance <= this.lodDistances.high) {
+        newLodLevel = 'high';
+      } else if (distance <= this.lodDistances.medium) {
+        newLodLevel = 'medium';
+      } else if (distance <= this.lodDistances.low) {
+        newLodLevel = 'low';
+      } else {
+        shouldBeVisible = false;
+      }
+
+      // Update visibility
+      if (shouldBeVisible !== lodData.isVisible) {
+        instance.setEnabled(shouldBeVisible);
+        lodData.isVisible = shouldBeVisible;
+      }
+
+      // Update LOD level if changed
+      if (newLodLevel !== lodData.lodLevel && shouldBeVisible) {
+        this.applyLODLevel(instance, newLodLevel);
+        lodData.lodLevel = newLodLevel;
+      }
+    }
+  }
+
+  /**
+   * Apply LOD level to an instance
+   */
+  applyLODLevel(instance, lodLevel) {
+    const applyToMesh = (mesh) => {
+      if (!mesh || !mesh.material) return;
+      const bump = mesh.material.bumpTexture;
+      if (!bump) return;
+      if (lodLevel === 'high') bump.level = 1.0;
+      else if (lodLevel === 'medium') bump.level = 0.5;
+      else if (lodLevel === 'low') bump.level = 0.1;
+    };
+
+    // Handle both single meshes and containers with child meshes
+    if (instance && typeof instance.getChildMeshes === 'function') {
+      const meshes = instance.getChildMeshes(false);
+      if (meshes.length === 0) {
+        applyToMesh(instance);
+      } else {
+        for (const m of meshes) applyToMesh(m);
+      }
+    } else {
+      applyToMesh(instance);
+    }
+  }
+
+  /**
+   * Remove instance from LOD tracking
+   */
+  removeLODInstance(instance) {
+    if (this.lodInstances.has(instance)) {
+      this.lodInstances.delete(instance);
+    }
+  }
+
+  /**
+   * Configure LOD system
+   */
+  configureLOD(enabled, distances = {}) {
+    this.lodEnabled = enabled;
+    this.lodDistances = { ...this.lodDistances, ...distances };
+  }
+
+  /**
+   * Get LOD statistics
+   */
+  getLODStats() {
+    const stats = {
+      totalInstances: this.lodInstances.size,
+      visible: 0,
+      hidden: 0,
+      lodLevels: { high: 0, medium: 0, low: 0 }
+    };
+
+    for (const [instance, lodData] of this.lodInstances) {
+      if (lodData.isVisible) {
+        stats.visible++;
+        stats.lodLevels[lodData.lodLevel]++;
+      } else {
+        stats.hidden++;
+      }
+    }
+
+    return stats;
+  }
+
+  /**
+   * Compress and optimize loaded assets
+   */
+  optimizeAssets() {
+    console.log('Optimizing loaded assets...');
+
+    // Merge identical materials
+    this.mergeIdenticalMaterials();
+
+    // Optimize textures
+    this.optimizeTextures();
+
+    // Generate mipmaps for better performance
+    this.generateMipmaps();
+
+    console.log('Asset optimization complete');
+  }
+
+  /**
+   * Merge materials with identical properties
+   */
+  mergeIdenticalMaterials() {
+    const materialMap = new Map();
+    const materialsToReplace = new Map();
+
+    Object.entries(this.materials).forEach(([name, material]) => {
+      const key = this.getMaterialKey(material);
+
+      if (materialMap.has(key)) {
+        // Mark for replacement with existing material
+        materialsToReplace.set(name, materialMap.get(key));
+      } else {
+        materialMap.set(key, material);
+      }
+    });
+
+    // Replace duplicate materials
+    materialsToReplace.forEach((replacementMaterial, materialName) => {
+      this.materials[materialName] = replacementMaterial;
+    });
+
+    console.log(`Merged ${materialsToReplace.size} duplicate materials`);
+  }
+
+  /**
+   * Generate a key for material comparison
+   */
+  getMaterialKey(material) {
+    if (material instanceof BABYLON.PBRMaterial) {
+      const color = material.albedoColor || material.baseColor;
+      return `pbr_${color?.toString()}_${material.roughness}_${material.metallic}`;
+    } else if (material instanceof BABYLON.StandardMaterial) {
+      return `std_${material.diffuseColor?.toString()}_${material.specularColor?.toString()}`;
+    }
+    return material.id;
+  }
+
+  /**
+   * Optimize texture memory usage
+   */
+  optimizeTextures() {
+    Object.values(this.textures).forEach(textureCategory => {
+      Object.values(textureCategory).forEach(texture => {
+        if (texture instanceof BABYLON.Texture) {
+          // Enable texture streaming for large textures
+          if (texture.getSize().width > 512) {
+            texture.updateSamplingMode(BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
+          }
+        }
+      });
+    });
+  }
+
+  /**
+   * Generate mipmaps for better performance
+   */
+  generateMipmaps() {
+    Object.values(this.textures).forEach(textureCategory => {
+      Object.values(textureCategory).forEach(texture => {
+        if (texture instanceof BABYLON.Texture && !texture.noMipmap) {
+          texture.updateSamplingMode(BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
+        }
+      });
+    });
   }
 
   /**
@@ -688,15 +1054,23 @@ export class AssetManager {
         url,
         this.scene,
         (container) => {
-          const meshes = container.meshes;
-          const root = meshes[0];
-          
+          // Add loaded content to the scene so transforms are computed
+          container.addAllToScene();
+
+          // Create a dedicated transform root and parent all container root nodes under it
+          const root = new BABYLON.TransformNode(`${name}_root`, this.scene);
+          for (const rn of container.rootNodes || []) {
+            rn.setParent(root);
+          }
+
+          // Disable all meshes in this model so only instances are visible
+          for (const m of container.meshes) {
+            if (m && m.setEnabled) m.setEnabled(false);
+          }
+
           // Store in assets
           this.assets[name] = root;
-          
-          // Initially disable
-          root.setEnabled(false);
-          
+
           console.log(`Loaded model: ${name}`);
           resolve(root);
         },
