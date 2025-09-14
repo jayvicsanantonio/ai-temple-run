@@ -108,6 +108,21 @@ const defaultConfig = {
     minScale: 0.6,
     maxScale: 2.0,
   },
+
+  // Game asset pipeline controls
+  gameAssets: {
+    character: {
+      mode: 'PROCEDURAL', // PROCEDURAL | GLB | HYPER3D | AUTO
+      glbUrl: '',
+      prompt: 'stylized runner',
+      name: 'player_h3d',
+    },
+    obstacles: {
+      list: [
+        // { name: 'logPrefab', url: '/models/log.glb' }
+      ],
+    },
+  },
 };
 
 function isPlainObject(value) {

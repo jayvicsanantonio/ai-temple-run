@@ -57,6 +57,7 @@ class TempleRunGame {
     this.gameSpeed = 1.0;
     this.speedIncreaseRate = 0.1;
     this.maxSpeed = 2.5;
+    this.currentCharacterAssetName = null;
   }
 
   /**
@@ -230,6 +231,71 @@ class TempleRunGame {
       },
       this.config
     );
+
+    // Kick off runtime asset pipeline (character + obstacle prefabs)
+    this.setupRuntimeAssets().catch((e) => console.warn('Runtime asset setup error:', e));
+  }
+
+  /**
+   * Load/generate character and obstacle prefabs based on config
+   */
+  async setupRuntimeAssets() {
+    const cfg = this.config?.gameAssets || {};
+    // Character
+    try {
+      const mode = (cfg.character?.mode || 'PROCEDURAL').toUpperCase();
+      if (mode === 'GLB' && cfg.character?.glbUrl) {
+        this.uiManager?.showStatusBanner('Loading character...', 'info', 1500);
+        const root = await this.blenderAssets.enqueueGLB({
+          url: cfg.character.glbUrl,
+          name: cfg.character.name || 'player_glb',
+          priority: 10,
+        });
+        if (root) {
+          this.playerController.setPlayerMesh(root);
+          this.assetOptimizer?.tryApplyLODs(root);
+          this.uiManager?.showStatusBanner('Character ready', 'info', 1200);
+        }
+      } else if (mode === 'HYPER3D' && this.hyper3d) {
+        this.uiManager?.showStatusBanner('Generating character...', 'info', 1500);
+        const root = await this.blenderAssets.generateCharacterAndImport(
+          cfg.character?.prompt || 'stylized runner',
+          { name: cfg.character?.name || 'player_h3d' }
+        );
+        if (root) {
+          this.playerController.setPlayerMesh(root);
+          this.assetOptimizer?.tryApplyLODs(root);
+          this.uiManager?.showStatusBanner('Character ready', 'info', 1200);
+        } else {
+          this.uiManager?.showStatusBanner('Character fallback used', 'warn', 1800);
+        }
+      }
+    } catch (e) {
+      console.warn('Character asset pipeline error:', e);
+      this.uiManager?.showStatusBanner('Character failed; using placeholder', 'warn', 2000);
+    }
+
+    // Obstacles
+    try {
+      const list = cfg.obstacles?.list || [];
+      if (list.length) {
+        this.uiManager?.showStatusBanner('Loading obstacles...', 'info', 1200);
+        await Promise.all(
+          list.map((o) =>
+            this.blenderAssets
+              .enqueueGLB({ url: o.url, name: o.name, priority: 5 })
+              .catch(() => null)
+          )
+        );
+        // Provide AssetManager and prefab names to obstacle manager
+        this.obstacleManager.setAssetManager?.(this.assetManager);
+        this.obstacleManager.setObstaclePrefabs?.(list.map((o) => o.name));
+        this.uiManager?.showStatusBanner('Obstacles ready', 'info', 1200);
+      }
+    } catch (e) {
+      console.warn('Obstacle asset pipeline error:', e);
+      this.uiManager?.showStatusBanner('Obstacle load failed; using primitives', 'warn', 2000);
+    }
   }
 
   /**
@@ -297,6 +363,73 @@ class TempleRunGame {
         updateStatus('Error');
       }
     });
+
+    // Character mode apply
+    this.uiManager.setOnCharacterModeChangeCallback(async ({ mode, glbUrl, prompt }) => {
+      await this.switchCharacterMode(mode, { glbUrl, prompt });
+    });
+  }
+
+  /**
+   * Switch character model at runtime based on mode.
+   */
+  async switchCharacterMode(mode, { glbUrl, prompt } = {}) {
+    const m = (mode || '').toUpperCase();
+    this.config.gameAssets = this.config.gameAssets || { character: {} };
+    this.config.gameAssets.character.mode = m;
+    if (glbUrl) this.config.gameAssets.character.glbUrl = glbUrl;
+    if (prompt) this.config.gameAssets.character.prompt = prompt;
+
+    try {
+      if (m === 'PROCEDURAL') {
+        const placeholder = this.createPlayerPlaceholder();
+        this.playerController.setPlayerMesh(placeholder);
+        this.currentCharacterAssetName = null;
+        this.uiManager?.showStatusBanner('Using procedural character', 'info', 1200);
+        return;
+      }
+      if (m === 'GLB' && this.config.gameAssets.character.glbUrl) {
+        const name = this.config.gameAssets.character.name || 'player_glb';
+        const root = await this.blenderAssets.enqueueGLB({
+          url: this.config.gameAssets.character.glbUrl,
+          name,
+          priority: 10,
+        });
+        if (root) {
+          if (this.currentCharacterAssetName && this.currentCharacterAssetName !== name) {
+            this.blenderAssets.release?.(this.currentCharacterAssetName);
+          }
+          this.playerController.setPlayerMesh(root);
+          this.assetOptimizer?.tryApplyLODs(root);
+          this.currentCharacterAssetName = name;
+          this.uiManager?.showStatusBanner('Character ready (GLB)', 'info', 1200);
+        }
+        return;
+      }
+      if (m === 'HYPER3D' && this.hyper3d) {
+        const name = this.config.gameAssets.character.name || 'player_h3d';
+        const root = await this.blenderAssets.generateCharacterAndImport(
+          this.config.gameAssets.character.prompt || 'stylized runner',
+          { name }
+        );
+        if (root) {
+          if (this.currentCharacterAssetName && this.currentCharacterAssetName !== name) {
+            this.blenderAssets.release?.(this.currentCharacterAssetName);
+          }
+          this.playerController.setPlayerMesh(root);
+          this.assetOptimizer?.tryApplyLODs(root);
+          this.currentCharacterAssetName = name;
+          this.uiManager?.showStatusBanner('Character ready (Hyper3D)', 'info', 1200);
+        } else {
+          this.uiManager?.showStatusBanner('Character generation failed', 'warn', 1800);
+        }
+        return;
+      }
+      this.uiManager?.showStatusBanner('Unknown character mode', 'warn', 1500);
+    } catch (e) {
+      console.warn('switchCharacterMode error:', e);
+      this.uiManager?.showStatusBanner('Character switch failed', 'error', 1800);
+    }
   }
 
   /**

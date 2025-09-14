@@ -22,6 +22,8 @@ export class ObstacleManager {
     this.lanes = [-2, 0, 2];
     this.physics = null;
     this.optimizer = null;
+    this.assetManager = null;
+    this.prefabNames = [];
   }
 
   /**
@@ -37,6 +39,20 @@ export class ObstacleManager {
 
   setAssetOptimizer(optimizer) {
     this.optimizer = optimizer;
+  }
+
+  /**
+   * Provide access to AssetManager for cloning prefabs
+   */
+  setAssetManager(assetManager) {
+    this.assetManager = assetManager;
+  }
+
+  /**
+   * Configure obstacle prefabs (names correspond to AssetManager assets)
+   */
+  setObstaclePrefabs(names) {
+    this.prefabNames = Array.isArray(names) ? names.slice() : [];
   }
 
   /**
@@ -114,12 +130,34 @@ export class ObstacleManager {
       // Update last spawn position
       this.lastSpawnZ = spawnZ;
 
-      // Configure appearance based on type
+      // Configure appearance based on type and attach prefab visual if available
       this.configureObstacleAppearance(obstacle, type);
+      this.attachPrefabVisual(obstacle);
 
       // Apply LODs if available
       if (this.optimizer) this.optimizer.tryApplyLODs(obstacle);
     }
+  }
+
+  /**
+   * Attach a prefab clone as the visual under the collision box, if available
+   */
+  attachPrefabVisual(obstacle) {
+    if (!this.assetManager || !this.prefabNames.length) return;
+    // Cleanup previous
+    if (obstacle._prefabVisual && typeof obstacle._prefabVisual.dispose === 'function') {
+      try {
+        obstacle._prefabVisual.dispose(false, true);
+      } catch {}
+    }
+    const pick = this.prefabNames[Math.floor(Math.random() * this.prefabNames.length)];
+    const clone = this.assetManager.getAsset(pick);
+    if (!clone) return;
+    clone.parent = obstacle;
+    clone.position.set(0, 0, 0);
+    obstacle._prefabVisual = clone;
+    // Hide the collision box mesh for visuals; keep it for physics/collisions
+    obstacle.visibility = 0;
   }
 
   /**

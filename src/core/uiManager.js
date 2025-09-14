@@ -80,6 +80,17 @@ export class UIManager {
           <button id="h3d-generate" class="ui-button small">Gen 3D</button>
           <span id="h3d-status" class="hud-status"></span>
         </div>
+        <div class="hud-item hud-debug">
+          <label class="hud-label">Character</label>
+          <select id="char-mode" class="hud-select">
+            <option value="PROCEDURAL">Procedural</option>
+            <option value="GLB">GLB</option>
+            <option value="HYPER3D">Hyper3D</option>
+          </select>
+          <input id="char-glb-url" class="hud-input" placeholder="/models/player.glb" />
+          <input id="char-prompt" class="hud-input" placeholder="runner prompt" />
+          <button id="char-apply" class="ui-button small">Apply</button>
+        </div>
       </div>
       <div id="status-banner" class="status-banner hidden"></div>
     `;
@@ -130,6 +141,10 @@ export class UIManager {
     this.elements.h3dGenerateBtn = document.getElementById('h3d-generate');
     this.elements.h3dStatus = document.getElementById('h3d-status');
     this.elements.statusBanner = document.getElementById('status-banner');
+    this.elements.charMode = document.getElementById('char-mode');
+    this.elements.charGlbUrl = document.getElementById('char-glb-url');
+    this.elements.charPrompt = document.getElementById('char-prompt');
+    this.elements.charApply = document.getElementById('char-apply');
 
     // Update high score display
     this.elements.highScoreDisplay.textContent = this.highScore;
@@ -165,6 +180,17 @@ export class UIManager {
           };
           updateStatus('Starting...');
           this.onHyper3DGenerate(prompt, updateStatus);
+        }
+      });
+    }
+
+    if (this.elements.charApply) {
+      this.elements.charApply.addEventListener('click', () => {
+        if (this.onCharacterModeChange) {
+          const mode = this.elements.charMode?.value || 'PROCEDURAL';
+          const glbUrl = this.elements.charGlbUrl?.value || '';
+          const prompt = this.elements.charPrompt?.value || '';
+          this.onCharacterModeChange({ mode, glbUrl, prompt });
         }
       });
     }
@@ -315,6 +341,14 @@ export class UIManager {
    */
   setOnHyper3DGenerateCallback(callback) {
     this.onHyper3DGenerate = callback;
+  }
+
+  /**
+   * Set Character Mode change callback
+   * @param {(opts: {mode:string, glbUrl?: string, prompt?: string}) => void} callback
+   */
+  setOnCharacterModeChangeCallback(callback) {
+    this.onCharacterModeChange = callback;
   }
 
   /**

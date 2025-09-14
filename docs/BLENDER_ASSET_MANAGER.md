@@ -41,9 +41,61 @@ game.blenderAssets.retain('runner_h3d'); // prevent unload
 game.blenderAssets.release('runner_h3d'); // allow disposal when refCount hits 0
 ```
 
+## App Config Examples
+
+You can configure the runtime asset pipeline via `window.__TEMPLE_RUN_CONFIG__` in `index.html`.
+Examples:
+
+```html
+<script>
+  window.__TEMPLE_RUN_CONFIG__ = {
+    gameAssets: {
+      character: {
+        mode: 'GLB',
+        glbUrl: '/models/player.glb',
+        name: 'player_glb'
+      },
+      obstacles: {
+        list: [
+          { name: 'logPrefab', url: '/models/log.glb' },
+          { name: 'spikePrefab', url: '/models/spike.glb' }
+        ]
+      }
+    }
+  };
+</script>
+```
+
+Hyper3D character generation:
+
+```html
+<script>
+  window.__TEMPLE_RUN_CONFIG__ = {
+    hyper3d: {
+      mode: 'MAIN_SITE',
+      baseUrl: 'https://your-hyper3d-endpoint',
+      subscriptionKey: '...'
+    },
+    gameAssets: {
+      character: {
+        mode: 'HYPER3D',
+        prompt: 'stylized runner with backpack',
+        name: 'player_h3d'
+      }
+    }
+  };
+  // Do not commit real keys; inject locally only.
+  // See docs/BLENDER_MCP.md for MCP config and env vars.
+</script>
+```
+
+## Runtime Toggle
+
+The HUD includes a small debug section where you can switch the character asset mode at runtime
+between PROCEDURAL, GLB (with URL), and HYPER3D (with prompt). Click Apply to swap the model.
+
 ## Notes
 
 - GLB loading is handled by Babylon’s `SceneLoader` via the project’s `AssetManager` wrapper.
 - The queue is intentionally simple (priority sort + small concurrency) to keep overhead low.
 - Three.js integration mentioned in the plan is replaced by Babylon’s loader in this repo.
-
