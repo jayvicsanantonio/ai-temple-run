@@ -14,16 +14,12 @@ export class ObstacleManager {
     this.lastSpawnZ = 0;
     this.minSpacing = 10;
     this.maxSpacing = 20;
-
+    
     // Obstacle types
     this.obstacleTypes = ['log', 'rock', 'pit', 'spike'];
-
+    
     // Lane positions matching player controller
     this.lanes = [-2, 0, 2];
-    this.physics = null;
-    this.optimizer = null;
-    this.assetManager = null;
-    this.prefabNames = [];
   }
 
   /**
@@ -33,48 +29,30 @@ export class ObstacleManager {
     this.createObstaclePool();
   }
 
-  setPhysicsManager(physics) {
-    this.physics = physics;
-  }
-
-  setAssetOptimizer(optimizer) {
-    this.optimizer = optimizer;
-  }
-
-  /**
-   * Provide access to AssetManager for cloning prefabs
-   */
-  setAssetManager(assetManager) {
-    this.assetManager = assetManager;
-  }
-
-  /**
-   * Configure obstacle prefabs (names correspond to AssetManager assets)
-   */
-  setObstaclePrefabs(names) {
-    this.prefabNames = Array.isArray(names) ? names.slice() : [];
-  }
-
   /**
    * Create a pool of reusable obstacles
    */
   createObstaclePool() {
     const poolSize = 20;
-
+    
     for (let i = 0; i < poolSize; i++) {
       // Create placeholder obstacles (boxes for now)
-      const obstacle = BABYLON.MeshBuilder.CreateBox(`obstacle_${i}`, { size: 1 }, this.scene);
-
+      const obstacle = BABYLON.MeshBuilder.CreateBox(
+        `obstacle_${i}`,
+        { size: 1 },
+        this.scene
+      );
+      
       obstacle.isVisible = false;
       obstacle.checkCollisions = true;
-
+      
       // Store obstacle data
       obstacle.obstacleData = {
         type: null,
         lane: null,
-        active: false,
+        active: false
       };
-
+      
       this.obstaclePool.push(obstacle);
     }
   }
@@ -100,64 +78,34 @@ export class ObstacleManager {
    */
   spawnObstacle(spawnZ) {
     const obstacle = this.getFromPool();
-
+    
     if (obstacle) {
       // Random lane selection
       const lane = Math.floor(Math.random() * this.lanes.length);
-
+      
       // Random obstacle type
       const type = this.obstacleTypes[Math.floor(Math.random() * this.obstacleTypes.length)];
-
+      
       // Position the obstacle
       obstacle.position.x = this.lanes[lane];
       obstacle.position.y = 0.5; // Height will vary by type
       obstacle.position.z = spawnZ;
-
+      
       // Configure obstacle data
       obstacle.obstacleData.type = type;
       obstacle.obstacleData.lane = lane;
       obstacle.obstacleData.active = true;
-
+      
       // Make visible and add to active list
       obstacle.isVisible = true;
       this.obstacles.push(obstacle);
-
-      // Register in physics (as static)
-      if (this.physics && this.physics.registerObstacle) {
-        this.physics.registerObstacle(obstacle);
-      }
-
+      
       // Update last spawn position
       this.lastSpawnZ = spawnZ;
-
-      // Configure appearance based on type and attach prefab visual if available
+      
+      // Configure appearance based on type
       this.configureObstacleAppearance(obstacle, type);
-      this.attachPrefabVisual(obstacle);
-
-      // Apply LODs if available
-      if (this.optimizer) this.optimizer.tryApplyLODs(obstacle);
     }
-  }
-
-  /**
-   * Attach a prefab clone as the visual under the collision box, if available
-   */
-  attachPrefabVisual(obstacle) {
-    if (!this.assetManager || !this.prefabNames.length) return;
-    // Cleanup previous
-    if (obstacle._prefabVisual && typeof obstacle._prefabVisual.dispose === 'function') {
-      try {
-        obstacle._prefabVisual.dispose(false, true);
-      } catch {}
-    }
-    const pick = this.prefabNames[Math.floor(Math.random() * this.prefabNames.length)];
-    const clone = this.assetManager.getAsset(pick);
-    if (!clone) return;
-    clone.parent = obstacle;
-    clone.position.set(0, 0, 0);
-    obstacle._prefabVisual = clone;
-    // Hide the collision box mesh for visuals; keep it for physics/collisions
-    obstacle.visibility = 0;
   }
 
   /**
@@ -168,7 +116,7 @@ export class ObstacleManager {
   configureObstacleAppearance(obstacle, type) {
     // Placeholder appearances - will be replaced with actual models
     const material = new BABYLON.StandardMaterial(`${type}_mat`, this.scene);
-
+    
     switch (type) {
       case 'log':
         obstacle.scaling = new BABYLON.Vector3(3, 0.5, 0.5);
@@ -188,7 +136,7 @@ export class ObstacleManager {
         material.diffuseColor = new BABYLON.Color3(0.7, 0.7, 0.7);
         break;
     }
-
+    
     obstacle.material = material;
   }
 
@@ -242,9 +190,6 @@ export class ObstacleManager {
     obstacle.obstacleData.active = false;
     obstacle.obstacleData.type = null;
     obstacle.obstacleData.lane = null;
-    if (this.physics && this.physics.unregisterObstacle) {
-      this.physics.unregisterObstacle(obstacle);
-    }
   }
 
   /**
@@ -260,7 +205,7 @@ export class ObstacleManager {
         return true;
       }
     }
-
+    
     return false;
   }
 
@@ -272,7 +217,7 @@ export class ObstacleManager {
     for (const obstacle of this.obstacles) {
       this.returnToPool(obstacle);
     }
-
+    
     this.obstacles = [];
     this.lastSpawnZ = 0;
   }

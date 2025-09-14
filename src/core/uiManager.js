@@ -9,7 +9,7 @@ export class UIManager {
     this.coins = 0;
     this.distance = 0;
     this.highScore = this.loadHighScore();
-
+    
     // UI Elements
     this.elements = {
       startScreen: null,
@@ -21,12 +21,11 @@ export class UIManager {
       highScoreDisplay: null,
       finalScoreDisplay: null,
       playButton: null,
-      restartButton: null,
+      restartButton: null
     };
-
+    
     this.onPlayCallback = null;
     this.onRestartCallback = null;
-    this.elements.statusBanner = null;
   }
 
   /**
@@ -119,7 +118,6 @@ export class UIManager {
     this.elements.finalScoreDisplay = document.getElementById('final-score');
     this.elements.playButton = document.getElementById('play-button');
     this.elements.restartButton = document.getElementById('restart-button');
-    // No debug elements
 
     // Update high score display
     this.elements.highScoreDisplay.textContent = this.highScore;
@@ -145,8 +143,6 @@ export class UIManager {
         this.onRestartCallback();
       }
     });
-
-    // No debug event listeners
   }
 
   /**
@@ -179,14 +175,12 @@ export class UIManager {
     this.elements.gameUI.classList.add('hidden');
   }
 
-  // Debug status banner removed
-
   /**
    * Show game over screen
    */
   showGameOverScreen() {
     this.elements.gameOverScreen.classList.remove('hidden');
-
+    
     // Update final scores
     document.getElementById('final-score').textContent = this.score;
     document.getElementById('final-coins').textContent = this.coins;
@@ -208,7 +202,7 @@ export class UIManager {
   updateScore(score) {
     this.score = score;
     this.elements.scoreDisplay.textContent = score;
-
+    
     // Update high score if necessary
     if (score > this.highScore) {
       this.highScore = score;
@@ -269,8 +263,6 @@ export class UIManager {
   setOnRestartCallback(callback) {
     this.onRestartCallback = callback;
   }
-
-  // Debug callback setters removed
 
   /**
    * Load high score from local storage

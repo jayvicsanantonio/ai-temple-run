@@ -12,12 +12,6 @@ import { CoinManager } from './core/coinManager.js';
 import { WorldManager } from './core/worldManager.js';
 import { AssetManager } from './core/assetManager.js';
 import { UIManager } from './core/uiManager.js';
-import { getConfig } from './core/config.js';
-//
-import { PhysicsEngineManager } from './core/physicsEngineManager.js';
-import { AssetOptimizer } from './core/assetOptimizer.js';
-import { PerformanceMonitor } from './core/performanceMonitor.js';
-import { BlenderAssetManager } from './core/blenderAssetManager.js';
 import { InputHandler } from './utils/inputHandler.js';
 
 // Import styles
@@ -36,13 +30,7 @@ class TempleRunGame {
     this.assetManager = null;
     this.uiManager = null;
     this.inputHandler = null;
-    this.config = null;
-    //
-    this.physics = null;
-    this.assetOptimizer = null;
-    this.performanceMonitor = null;
-    this.blenderAssets = null;
-
+    
     // Game state
     this.isPlaying = false;
     this.isPaused = false;
@@ -51,7 +39,6 @@ class TempleRunGame {
     this.gameSpeed = 1.0;
     this.speedIncreaseRate = 0.1;
     this.maxSpeed = 2.5;
-    this.currentCharacterAssetName = null;
   }
 
   /**
@@ -59,29 +46,26 @@ class TempleRunGame {
    */
   async init() {
     console.log('Initializing Temple Run Web Game...');
-
+    
     // Setup canvas
     this.setupCanvas();
-
+    
     // Initialize scene
     this.mainScene = new MainScene(this.canvas);
     this.scene = await this.mainScene.init();
-
-    // Load config (including optional external assets.json) before systems
-    this.config = await this.loadExternalAssetsConfig();
-
+    
     // Initialize game systems
     await this.initializeSystems();
-
+    
     // Setup input
     this.setupInput();
-
+    
     // Setup UI callbacks
     this.setupUICallbacks();
-
+    
     // Initialize UI
     this.uiManager.init();
-
+    
     console.log('Game initialized successfully!');
   }
 
@@ -105,183 +89,64 @@ class TempleRunGame {
     // Initialize asset manager first
     this.assetManager = new AssetManager(this.scene);
     await this.assetManager.init();
-
-    // Initialize physics
-    this.physics = new PhysicsEngineManager(this.scene);
-    this.physics.detectAndInit();
-
+    
     // Initialize game loop
     this.gameLoop = new GameLoop(this.scene);
-
+    
     // Initialize player controller with improved model
     this.playerController = new PlayerController(this.scene);
     const playerMesh = this.assetManager.getAsset('player') || this.createPlayerPlaceholder();
     this.playerController.init(playerMesh);
-    // Connect player to physics
-    if (this.physics) {
-      this.playerController.enablePhysics(this.physics);
-      this.physics.attachPlayer(this.playerController.player, this.playerController.collider, {
-        forwardSpeed: this.playerController.forwardSpeed,
-        baseY: this.playerController.baseY,
-        laneX: 0,
-      });
-    }
-
-    // Initialize LOD Asset Optimizer
-    this.assetOptimizer = new AssetOptimizer(this.scene, this.config);
-    // Apply LODs to player mesh
-    this.assetOptimizer.tryApplyLODs(this.playerController.player);
-
+    
     // Initialize obstacle manager
     this.obstacleManager = new ObstacleManager(this.scene);
     this.obstacleManager.init();
-    if (this.physics && this.obstacleManager.setPhysicsManager) {
-      this.obstacleManager.setPhysicsManager(this.physics);
-    }
-    if (this.obstacleManager.setAssetOptimizer) {
-      this.obstacleManager.setAssetOptimizer(this.assetOptimizer);
-    }
-
+    
     // Initialize coin manager
     this.coinManager = new CoinManager(this.scene);
     this.coinManager.init();
-
+    
     // Initialize world manager with obstacle and coin managers
     this.worldManager = new WorldManager(this.scene, this.obstacleManager, this.coinManager);
     this.worldManager.init();
-    this.worldManager.setAssetManager?.(this.assetManager);
-
+    
     // Initialize UI manager
     this.uiManager = new UIManager();
-
+    
     // Initialize input handler
     this.inputHandler = new InputHandler();
     this.inputHandler.init();
-
+    
     // Register systems with game loop
     this.gameLoop.registerSystem(this.playerController);
     this.gameLoop.registerSystem(this.worldManager);
     this.gameLoop.registerSystem({
-      update: (deltaTime) => this.updateGame(deltaTime),
+      update: (deltaTime) => this.updateGame(deltaTime)
     });
-    // Physics step
-    this.gameLoop.registerSystem({
-      update: (dt) => {
-        if (this.physics) {
-          const t0 = performance.now();
-          this.physics.update(dt);
-          const t1 = performance.now();
-          if (this.performanceMonitor) this.performanceMonitor.recordPhysicsTime(dt, t1 - t0);
-        }
-      },
-    });
-
-    // Performance monitor (after systems constructed)
-    this.performanceMonitor = new PerformanceMonitor(
-      this.scene.getEngine(),
-      this.scene,
-      this.assetOptimizer,
-      this.config,
-      this.physics
-    );
-    this.gameLoop.registerSystem({
-      update: () => this.performanceMonitor.update(),
-    });
-
-    // Unified Blender asset manager (Hyper3D + PolyHaven + AssetManager)
-    this.blenderAssets = new BlenderAssetManager(this.scene, this.assetManager, {}, this.config);
-
-    // Kick off runtime asset pipeline (character + obstacle prefabs)
-    this.setupRuntimeAssets().catch((e) => console.warn('Runtime asset setup error:', e));
-  }
-
-  /**
-   * Load optional external asset config from /assets/assets.json and merge into default config.
-   */
-  async loadExternalAssetsConfig() {
-    const base = getConfig();
-    try {
-      const res = await fetch('/assets/assets.json');
-      if (res.ok) {
-        const ext = await res.json();
-        base.gameAssets = {
-          ...base.gameAssets,
-          ...(ext || {}),
-          obstacles: ext?.obstacles || base.gameAssets?.obstacles,
-        };
-      }
-    } catch (e) {
-      // Ignore; fall back to defaults
-      console.warn('assets.json not loaded:', e?.message || e);
-    }
-    return base;
-  }
-
-  /**
-   * Load/generate character and obstacle prefabs based on config
-   */
-  async setupRuntimeAssets() {
-    const cfg = this.config?.gameAssets || {};
-    // Character
-    try {
-      const mode = (cfg.character?.mode || 'PROCEDURAL').toUpperCase();
-      if (mode === 'GLB' && cfg.character?.glbUrl) {
-        const root = await this.blenderAssets.enqueueGLB({
-          url: cfg.character.glbUrl,
-          name: cfg.character.name || 'player_glb',
-          priority: 10,
-        });
-        if (root) {
-          this.playerController.setPlayerMesh(root);
-          this.assetOptimizer?.tryApplyLODs(root);
-        }
-      }
-    } catch (e) {
-      console.warn('Character asset pipeline error:', e);
-    }
-
-    // Obstacles
-    try {
-      const list = cfg.obstacles?.list || [];
-      if (list.length) {
-        await Promise.all(
-          list.map((o) =>
-            this.blenderAssets
-              .enqueueGLB({ url: o.url, name: o.name, priority: 5 })
-              .catch(() => null)
-          )
-        );
-        // Provide AssetManager and prefab names to obstacle manager
-        this.obstacleManager.setAssetManager?.(this.assetManager);
-        this.obstacleManager.setObstaclePrefabs?.(list.map((o) => o.name));
-        // Prefer a bridge module as the visual path if available
-        const preferred =
-          list.find((o) => o.name === 'bridge_stone') || list.find((o) => o.name === 'bridge_wood');
-        if (preferred) this.worldManager.setPathPrefab?.(preferred.name);
-      }
-    } catch (e) {
-      console.warn('Obstacle asset pipeline error:', e);
-    }
   }
 
   /**
    * Create a placeholder player mesh
    */
   createPlayerPlaceholder() {
-    const player = BABYLON.MeshBuilder.CreateBox('player', { size: 1 }, this.scene);
-
+    const player = BABYLON.MeshBuilder.CreateBox(
+      'player',
+      { size: 1 },
+      this.scene
+    );
+    
     player.position.y = 0.5;
-
+    
     // Create player material
     const playerMaterial = new BABYLON.StandardMaterial('playerMat', this.scene);
     playerMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.6, 1);
     player.material = playerMaterial;
-
+    
     // Enable shadows
     if (this.mainScene.shadowGenerator) {
       this.mainScene.shadowGenerator.addShadowCaster(player);
     }
-
+    
     return player;
   }
 
@@ -303,48 +168,6 @@ class TempleRunGame {
   setupUICallbacks() {
     this.uiManager.setOnPlayCallback(() => this.startGame());
     this.uiManager.setOnRestartCallback(() => this.restartGame());
-    // No debug UI callbacks
-  }
-
-  /**
-   * Switch character model at runtime based on mode.
-   */
-  async switchCharacterMode(mode, { glbUrl, prompt } = {}) {
-    const m = (mode || '').toUpperCase();
-    this.config.gameAssets = this.config.gameAssets || { character: {} };
-    this.config.gameAssets.character.mode = m;
-    if (glbUrl) this.config.gameAssets.character.glbUrl = glbUrl;
-    if (prompt) this.config.gameAssets.character.prompt = prompt;
-
-    try {
-      if (m === 'PROCEDURAL') {
-        const placeholder = this.createPlayerPlaceholder();
-        this.playerController.setPlayerMesh(placeholder);
-        this.currentCharacterAssetName = null;
-        return;
-      }
-      if (m === 'GLB' && this.config.gameAssets.character.glbUrl) {
-        const name = this.config.gameAssets.character.name || 'player_glb';
-        const root = await this.blenderAssets.enqueueGLB({
-          url: this.config.gameAssets.character.glbUrl,
-          name,
-          priority: 10,
-        });
-        if (root) {
-          if (this.currentCharacterAssetName && this.currentCharacterAssetName !== name) {
-            this.blenderAssets.release?.(this.currentCharacterAssetName);
-          }
-          this.playerController.setPlayerMesh(root);
-          this.assetOptimizer?.tryApplyLODs(root);
-          this.currentCharacterAssetName = name;
-        }
-        return;
-      }
-      // Unknown mode: no-op
-    } catch (e) {
-      console.warn('switchCharacterMode error:', e);
-      // silent failure for debug-only switch
-    }
   }
 
   /**
@@ -352,22 +175,22 @@ class TempleRunGame {
    */
   startGame() {
     console.log('Starting game...');
-
+    
     this.isPlaying = true;
     this.isPaused = false;
     this.score = 0;
     this.distanceTraveled = 0;
     this.gameSpeed = 1.0;
-
+    
     // Reset all systems
     this.playerController.reset();
     this.obstacleManager.reset();
     this.coinManager.reset();
     this.worldManager.reset();
-
+    
     // Enable input
     this.inputHandler.enable();
-
+    
     // Start game loop
     this.gameLoop.start();
   }
@@ -385,9 +208,9 @@ class TempleRunGame {
    */
   togglePause() {
     if (!this.isPlaying) return;
-
+    
     this.isPaused = !this.isPaused;
-
+    
     if (this.isPaused) {
       this.gameLoop.pause();
       console.log('Game paused');
@@ -402,44 +225,41 @@ class TempleRunGame {
    */
   updateGame(deltaTime) {
     if (!this.isPlaying || this.isPaused) return;
-
+    
     // Update distance traveled
     this.distanceTraveled += this.playerController.forwardSpeed * deltaTime;
-
+    
     // Update score based on distance and coins
-    this.score = Math.floor(this.distanceTraveled) + this.coinManager.getCollectedCoins() * 10;
-
+    this.score = Math.floor(this.distanceTraveled) + (this.coinManager.getCollectedCoins() * 10);
+    
     // Update UI
     this.uiManager.updateScore(this.score);
     this.uiManager.updateDistance(this.distanceTraveled);
     this.uiManager.updateCoins(this.coinManager.getCollectedCoins());
-
+    
     // Check for coin collection (uses player position)
     const coinsCollected = this.coinManager.checkCollection(this.playerController.player);
     if (coinsCollected > 0) {
       console.log(`Collected ${coinsCollected} coins!`);
     }
-
-    // Physics-aware collision detection
-    const hit = this.physics
-      ? this.physics.checkCollisionWithObstacles()
-      : this.obstacleManager.checkCollision(this.playerController.collider);
-    if (hit) {
+    
+    // Check for collisions with obstacles using the collider mesh
+    if (this.obstacleManager.checkCollision(this.playerController.collider)) {
       this.gameOver();
     }
-
+    
     // Update camera to follow player
     if (this.playerController.player) {
       this.mainScene.updateCameraFollow(this.playerController.player.position);
     }
-
+    
     // Gradually increase game speed
     this.increaseGameSpeed(deltaTime);
-
+    
     // World manager handles obstacle and coin spawning now
     const playerPos = this.playerController.player ? this.playerController.player.position : null;
     this.worldManager.update(deltaTime, playerPos);
-
+    
     // Still need to update obstacle and coin animations/cleanup
     this.obstacleManager.updateObstacles(playerPos);
     this.coinManager.updateCoins(deltaTime, playerPos);
@@ -452,7 +272,7 @@ class TempleRunGame {
     if (this.gameSpeed < this.maxSpeed) {
       this.gameSpeed += this.speedIncreaseRate * deltaTime;
       this.gameLoop.setGameSpeed(this.gameSpeed);
-
+      
       // Also increase player forward speed
       const newSpeed = 10 + (this.gameSpeed - 1) * 5;
       this.playerController.setForwardSpeed(newSpeed);
@@ -467,16 +287,16 @@ class TempleRunGame {
     console.log(`Final Score: ${this.score}`);
     console.log(`Distance: ${Math.floor(this.distanceTraveled)}m`);
     console.log(`Coins: ${this.coinManager.getCollectedCoins()}`);
-
+    
     this.isPlaying = false;
-
+    
     // Stop game systems
     this.gameLoop.stop();
     this.inputHandler.disable();
-
+    
     // Show game over UI
     this.uiManager.gameOver();
-
+    
     // Play death animation
     this.playerController.die();
   }
