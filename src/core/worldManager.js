@@ -28,9 +28,10 @@ export class WorldManager {
 
     // Model variations for different tile types
     this.tileModelMap = {
-      'pathwaySegment': 'pathwaySegment',
-      'curvedPath': 'curvedPath',
-      'intersection': 'intersection'
+      pathwaySegment: 'pathwaySegment',
+      curvedPath: 'curvedPath',
+      // Align to loaded GLB name
+      intersection: 'pathIntersection',
     };
     
     // Difficulty parameters
@@ -114,13 +115,22 @@ export class WorldManager {
 
       path.scaling = new BABYLON.Vector3(1, 1, 1);
       path.position.y = 0;
-      path.receiveShadows = true;
       path.parent = tileContainer;
 
-      // Apply stone material if available
-      const stoneMaterial = this.assetManager?.getMaterial('castleWallSlates');
-      if (stoneMaterial) {
-        path.material = stoneMaterial;
+      // Apply receiveShadows/material to source meshes to avoid instance warnings
+      const stoneMaterial = this.assetManager?.getMaterial('castle_wall_slates');
+      const applyToMeshOrSource = (mesh) => {
+        const target = mesh && mesh.sourceMesh ? mesh.sourceMesh : mesh;
+        if (!target) return;
+        if (stoneMaterial && target.material !== undefined) target.material = stoneMaterial;
+        if (target.receiveShadows !== undefined) target.receiveShadows = true;
+      };
+
+      if (typeof path.getChildMeshes === 'function') {
+        const children = path.getChildMeshes(false);
+        for (const m of children) applyToMeshOrSource(m);
+      } else {
+        applyToMeshOrSource(path);
       }
     } else {
       // Fallback to procedural geometry
@@ -209,7 +219,8 @@ export class WorldManager {
    */
   addTempleArchitecture(tileContainer, name) {
     const pillarModel = this.assetManager?.getModel('stonePillar');
-    const wallModel = this.assetManager?.getModel('wallSegment');
+    // Align wall model name (kept for future use)
+    const wallModel = this.assetManager?.getModel('templeWall');
 
     if (pillarModel) {
       // Add stone pillars on sides with LOD
@@ -267,7 +278,7 @@ export class WorldManager {
   addDecorations(tile, zPosition) {
     // Random chance to add temple decorations
     if (Math.random() < 0.4) {
-      const decorationModels = ['templeTree', 'mossStone', 'carvedSymbol'];
+      const decorationModels = ['tree', 'mossStone', 'carvedSymbol'];
       const randomDecoration = decorationModels[Math.floor(Math.random() * decorationModels.length)];
       const decorationModel = this.assetManager?.getModel(randomDecoration);
 

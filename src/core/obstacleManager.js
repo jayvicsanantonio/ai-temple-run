@@ -19,10 +19,11 @@ export class ObstacleManager {
 
     // Temple obstacle types mapped to GLB models
     this.obstacleTypes = ['log', 'rock', 'spike'];
+    // Align obstacle model names with loaded/procedural assets
     this.obstacleModelMap = {
-      'log': 'logObstacle',
-      'rock': 'stoneBlock',
-      'spike': 'spikeTrap'
+      log: 'logObstacle',
+      rock: 'rockObstacle',
+      spike: 'spikeObstacle',
     };
 
     // Lane positions matching player controller
@@ -128,9 +129,14 @@ export class ObstacleManager {
         obstacle.position.clone()
       ) || obstacleModel.createInstance(`${obstacle.name}_${type}`);
 
+      // Parent instance root to obstacle container
       mesh.parent = obstacle;
-      mesh.checkCollisions = true;
-      obstacle.obstacleData.mesh = mesh;
+      // Use a representative collider mesh for collision checks
+      const collider = (mesh && typeof mesh.getChildMeshes === 'function')
+        ? (mesh.getChildMeshes(false)[0] || mesh)
+        : mesh;
+      obstacle.obstacleData.mesh = collider;
+      obstacle.obstacleData.instanceRoot = mesh;
 
       // Configure scaling and positioning based on type
       switch (type) {
@@ -149,11 +155,20 @@ export class ObstacleManager {
       }
 
       // Apply appropriate material if available
-      const materialName = type === 'log' ? 'barkBrown' :
-                          type === 'rock' ? 'castleWallSlates' : 'metalPlate';
+      // Align material keys to texture/material names
+      const materialName = type === 'log' ? 'bark_brown' :
+                          type === 'rock' ? 'castle_wall_slates' : 'metal_plate';
       const material = this.assetManager?.getMaterial(materialName);
       if (material) {
-        mesh.material = material;
+        const applyToMeshOrSource = (m) => {
+          const target = m && m.sourceMesh ? m.sourceMesh : m;
+          if (target && target.material !== undefined) target.material = material;
+        };
+        if (typeof mesh.getChildMeshes === 'function') {
+          for (const m of mesh.getChildMeshes(false)) applyToMeshOrSource(m);
+        } else {
+          applyToMeshOrSource(mesh);
+        }
       }
     } else {
       // Fallback to procedural geometry
@@ -245,10 +260,17 @@ export class ObstacleManager {
     // Dispose of the mesh instance and remove from LOD tracking
     if (obstacle.obstacleData.mesh) {
       if (this.assetManager) {
-        this.assetManager.removeLODInstance(obstacle.obstacleData.mesh);
+        // Prefer removing the instance root if available
+        const root = obstacle.obstacleData.instanceRoot || obstacle.obstacleData.mesh;
+        this.assetManager.removeLODInstance(root);
       }
-      obstacle.obstacleData.mesh.dispose();
+      // Dispose collider and any instance root container if present
+      if (obstacle.obstacleData.mesh.dispose) obstacle.obstacleData.mesh.dispose();
+      if (obstacle.obstacleData.instanceRoot && obstacle.obstacleData.instanceRoot !== obstacle.obstacleData.mesh && obstacle.obstacleData.instanceRoot.dispose) {
+        obstacle.obstacleData.instanceRoot.dispose();
+      }
       obstacle.obstacleData.mesh = null;
+      obstacle.obstacleData.instanceRoot = null;
     }
   }
 

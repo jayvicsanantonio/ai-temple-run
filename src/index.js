@@ -103,6 +103,8 @@ class TempleRunGame {
     // Initialize asset manager first
     this.assetManager = new AssetManager(this.scene, this.performanceMonitor);
     await this.assetManager.init();
+    // Enable and configure LOD distances aligned with gameplay scale
+    this.assetManager.configureLOD(true, { high: 30, medium: 70, low: 120 });
     
     // Initialize game loop
     this.gameLoop = new GameLoop(this.scene);

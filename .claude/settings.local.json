@@ -9,7 +9,12 @@
       "mcp__blender__get_polyhaven_status",
       "mcp__blender__search_polyhaven_assets",
       "Read(//Users/jayvicsanantonio/**)",
-      "mcp__blender__download_polyhaven_asset"
+      "mcp__blender__download_polyhaven_asset",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_console_messages"
     ],
     "deny": [],
     "ask": []
