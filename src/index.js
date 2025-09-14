@@ -44,6 +44,9 @@ class TempleRunGame {
     this.gameSpeed = 1.0;
     this.speedIncreaseRate = 0.1;
     this.maxSpeed = 2.5;
+
+    // Debug toggles
+    this._debugColliders = false;
   }
 
   /**
@@ -114,9 +117,19 @@ class TempleRunGame {
     const playerMesh = this.assetManager.getAsset('player') || this.createPlayerPlaceholder();
     this.playerController.init(playerMesh);
     
+    // Check for debug mode and initialize collider debug state
+    this.debugMode = window.location.search.includes('debug=true');
+    this._debugColliders = this.debugMode;
+    if (this._debugColliders) {
+      this.playerController.setDebugCollider(true);
+    }
+    
     // Initialize obstacle manager
     this.obstacleManager = new ObstacleManager(this.scene, this.assetManager);
     this.obstacleManager.init();
+    if (this._debugColliders) {
+      this.obstacleManager.setDebugColliders(true);
+    }
     
     // Initialize coin manager
     this.coinManager = new CoinManager(this.scene);
@@ -135,9 +148,6 @@ class TempleRunGame {
 
     // Initialize performance test utility
     this.performanceTest = new PerformanceTest(this);
-
-    // Check for debug mode
-    this.debugMode = window.location.search.includes('debug=true');
     
     // Register systems with game loop
     this.gameLoop.registerSystem(this.playerController);
@@ -182,6 +192,7 @@ class TempleRunGame {
     this.inputHandler.setOnJump(() => this.playerController.jump());
     this.inputHandler.setOnSlide(() => this.playerController.slide());
     this.inputHandler.setOnPause(() => this.togglePause());
+    this.inputHandler.setOnToggleColliders(() => this.toggleColliders());
   }
 
   /**
@@ -269,7 +280,8 @@ class TempleRunGame {
     }
     
     // Check for collisions with obstacles using the collider mesh
-    if (this.obstacleManager.checkCollision(this.playerController.collider)) {
+    // Add a small grace distance to avoid instant game over on spawn
+    if (this.distanceTraveled > 5 && this.obstacleManager.checkCollision(this.playerController.collider)) {
       this.gameOver();
     }
     
@@ -342,6 +354,20 @@ class TempleRunGame {
     
     // Play death animation
     this.playerController.die();
+  }
+
+  /**
+   * Toggle collider debug visualization for player and obstacles
+   */
+  toggleColliders() {
+    this._debugColliders = !this._debugColliders;
+    if (this.playerController && this.playerController.setDebugCollider) {
+      this.playerController.setDebugCollider(this._debugColliders);
+    }
+    if (this.obstacleManager && this.obstacleManager.setDebugColliders) {
+      this.obstacleManager.setDebugColliders(this._debugColliders);
+    }
+    console.log(`Collider debug: ${this._debugColliders ? 'ON' : 'OFF'}`);
   }
 
   /**

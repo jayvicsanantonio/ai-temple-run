@@ -98,6 +98,19 @@ export class WorldManager {
     // Create parent container for the tile
     const tileContainer = new BABYLON.TransformNode(name, this.scene);
 
+    // Always create a thin procedural base so a path is visible even if GLB fails
+    const basePath = BABYLON.MeshBuilder.CreateBox(
+      `${name}_basePath`,
+      { width: this.tileWidth, height: 0.2, depth: this.tileLength },
+      this.scene
+    );
+    basePath.position.y = -0.1;
+    basePath.receiveShadows = true;
+    basePath.checkCollisions = false;
+    basePath.parent = tileContainer;
+    const baseMat = this.assetManager?.getMaterial('castle_wall_slates') || this.tileMaterials[0];
+    if (baseMat) basePath.material = baseMat;
+
     // Choose tile type for variety
     const tileType = this.tileTypes[Math.floor(Math.random() * this.tileTypes.length)];
     const modelName = this.tileModelMap[tileType];
@@ -107,7 +120,7 @@ export class WorldManager {
 
     if (pathwayModel) {
       // Use the GLB temple pathway model with LOD
-      const path = this.assetManager.createLODInstance(
+      let path = this.assetManager.createLODInstance(
         modelName,
         `${name}_path`,
         new BABYLON.Vector3(0, 0, 0)
@@ -128,21 +141,25 @@ export class WorldManager {
 
       if (typeof path.getChildMeshes === 'function') {
         const children = path.getChildMeshes(false);
-        for (const m of children) applyToMeshOrSource(m);
+        // If instancing produced no visible meshes, fallback to procedural tile
+        if (!children || children.length === 0) {
+          if (path.dispose) path.dispose();
+          path = null;
+        } else {
+          for (const m of children) applyToMeshOrSource(m);
+        }
       } else {
         applyToMeshOrSource(path);
       }
+
+      // Fallback when GLB path didn't yield meshes
+      // If GLB produced nothing, the procedural base remains as the path
+      if (!path) {
+        console.warn(`Path GLB produced no meshes for ${modelName}, using base path`);
+      }
     } else {
-      // Fallback to procedural geometry
-      const path = BABYLON.MeshBuilder.CreateBox(
-        `${name}_path`,
-        { width: this.tileWidth, height: 0.5, depth: this.tileLength },
-        this.scene
-      );
-      path.position.y = -0.25;
-      path.material = this.tileMaterials[0];
-      path.receiveShadows = true;
-      path.parent = tileContainer;
+      // No GLB available; procedural base already created above
+      console.warn(`No pathway model for ${modelName}, using base path`);
     }
 
     // Add temple architecture elements (pillars, walls)
@@ -164,9 +181,16 @@ export class WorldManager {
    * Spawn initial tiles
    */
   spawnInitialTiles() {
+    // Force first few tiles to be straight segments for clarity
+    const firstType = this.currentTileType;
     for (let i = 0; i < this.tilesAhead; i++) {
+      // Bias to pathwaySegment for first 2 tiles
+      if (i < 2) {
+        this.currentTileType = 'pathwaySegment';
+      }
       this.spawnTile(i * this.tileLength);
     }
+    this.currentTileType = firstType;
   }
 
   /**
@@ -181,7 +205,7 @@ export class WorldManager {
       tile.tileData.active = true;
       
       // Add obstacles and coins based on difficulty
-      if (zPosition > 20) { // Don't spawn obstacles in the first few tiles
+      if (zPosition > 40) { // Don't spawn obstacles in the first few tiles
         this.populateTile(tile, zPosition);
       }
       
@@ -218,58 +242,8 @@ export class WorldManager {
    * Add temple architecture elements to a tile
    */
   addTempleArchitecture(tileContainer, name) {
-    const pillarModel = this.assetManager?.getModel('stonePillar');
-    // Align wall model name (kept for future use)
-    const wallModel = this.assetManager?.getModel('templeWall');
-
-    if (pillarModel) {
-      // Add stone pillars on sides with LOD
-      const leftPosition = new BABYLON.Vector3(-this.tileWidth / 2 - 1, 0, 0);
-      const rightPosition = new BABYLON.Vector3(this.tileWidth / 2 + 1, 0, 0);
-
-      const leftPillar = this.assetManager.createLODInstance(
-        'stonePillar',
-        `${name}_leftPillar`,
-        leftPosition
-      ) || pillarModel.createInstance(`${name}_leftPillar`);
-
-      leftPillar.position.x = -this.tileWidth / 2 - 1;
-      leftPillar.position.y = 0;
-      leftPillar.scaling = new BABYLON.Vector3(0.8, 1, 0.8);
-      leftPillar.parent = tileContainer;
-
-      const rightPillar = this.assetManager.createLODInstance(
-        'stonePillar',
-        `${name}_rightPillar`,
-        rightPosition
-      ) || pillarModel.createInstance(`${name}_rightPillar`);
-
-      rightPillar.position.x = this.tileWidth / 2 + 1;
-      rightPillar.position.y = 0;
-      rightPillar.scaling = new BABYLON.Vector3(0.8, 1, 0.8);
-      rightPillar.parent = tileContainer;
-    } else {
-      // Fallback to procedural walls
-      const leftWall = BABYLON.MeshBuilder.CreateBox(
-        `${name}_leftWall`,
-        { width: 0.5, height: 2, depth: this.tileLength },
-        this.scene
-      );
-      leftWall.position.x = -this.tileWidth / 2 - 0.25;
-      leftWall.position.y = 1;
-      leftWall.material = this.tileMaterials[2];
-      leftWall.parent = tileContainer;
-
-      const rightWall = BABYLON.MeshBuilder.CreateBox(
-        `${name}_rightWall`,
-        { width: 0.5, height: 2, depth: this.tileLength },
-        this.scene
-      );
-      rightWall.position.x = this.tileWidth / 2 + 0.25;
-      rightWall.position.y = 1;
-      rightWall.material = this.tileMaterials[2];
-      rightWall.parent = tileContainer;
-    }
+    // Disabled pillars/walls to keep the road clear
+    return;
   }
 
   /**

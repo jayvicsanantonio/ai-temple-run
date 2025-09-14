@@ -707,38 +707,40 @@ export class AssetManager {
     };
 
     // Helper to instance all child meshes under a root into a container
-    const instanceHierarchy = (root, name) => {
+    const instanceHierarchy = (root, name, containerPos = new BABYLON.Vector3(0, 0, 0)) => {
       const container = new BABYLON.TransformNode(name, this.scene);
 
       // Include root if it's a mesh with geometry
       if (root && typeof root.getTotalVertices === 'function' && root.getTotalVertices() > 0) {
+        root.computeWorldMatrix(true);
         const inst = root.createInstance(`${name}_root`);
-        // Copy world transform to instance and then parent to container
+        // Compute local transform relative to container position (container has no rotation/scale)
         const wm = root.getWorldMatrix();
         const s = new BABYLON.Vector3();
         const r = new BABYLON.Quaternion();
         const t = new BABYLON.Vector3();
         wm.decompose(s, r, t);
-        inst.position.copyFrom(t);
+        inst.parent = container;
+        inst.position.copyFrom(t.subtract(containerPos));
         inst.rotationQuaternion = r;
         inst.scaling.copyFrom(s);
-        inst.parent = container;
       }
 
       // Instance all descendant meshes and preserve world transforms
       const descendants = typeof root.getChildMeshes === 'function' ? root.getChildMeshes(false) : [];
       for (const child of descendants) {
         if (child && typeof child.getTotalVertices === 'function' && child.getTotalVertices() > 0) {
+          child.computeWorldMatrix(true);
           const childInst = child.createInstance(`${name}_${child.name}`);
           const wm = child.getWorldMatrix();
           const s = new BABYLON.Vector3();
           const r = new BABYLON.Quaternion();
           const t = new BABYLON.Vector3();
           wm.decompose(s, r, t);
-          childInst.position.copyFrom(t);
+          childInst.parent = container;
+          childInst.position.copyFrom(t.subtract(containerPos));
           childInst.rotationQuaternion = r;
           childInst.scaling.copyFrom(s);
-          childInst.parent = container;
         }
       }
 
@@ -752,7 +754,7 @@ export class AssetManager {
 
     // If not possible (e.g., TransformNode or mesh without geometry), instance hierarchy
     if (!instance) {
-      instance = instanceHierarchy(model, instanceName);
+      instance = instanceHierarchy(model, instanceName, position || new BABYLON.Vector3(0, 0, 0));
     }
 
     if (position && instance && instance.position) {
@@ -775,6 +777,43 @@ export class AssetManager {
   }
 
   /**
+   * Recenters an instance container so its children's bounding center aligns with the container position.
+   * Useful to ensure visuals line up with gameplay colliders.
+   * @param {BABYLON.TransformNode} container
+   */
+  centerInstance(container) {
+    if (!container || typeof container.getChildMeshes !== 'function') return;
+    const meshes = container.getChildMeshes(false);
+    if (!meshes || meshes.length === 0) return;
+
+    // Compute world-space bounds across all child meshes
+    let min = new BABYLON.Vector3(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
+    let max = new BABYLON.Vector3(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
+    for (const m of meshes) {
+      if (!m || !m.getBoundingInfo) continue;
+      m.computeWorldMatrix(true);
+      const bb = m.getBoundingInfo().boundingBox;
+      const bmin = bb.minimumWorld;
+      const bmax = bb.maximumWorld;
+      min = BABYLON.Vector3.Minimize(min, bmin);
+      max = BABYLON.Vector3.Maximize(max, bmax);
+    }
+
+    const centerWorld = min.add(max).scale(0.5);
+    const containerWorld = (typeof container.getAbsolutePosition === 'function')
+      ? container.getAbsolutePosition()
+      : container.position;
+    const offset = centerWorld.subtract(containerWorld);
+
+    if (offset.lengthSquared() < 1e-6) return; // Already centered
+
+    for (const m of meshes) {
+      if (!m || !m.position) continue;
+      m.position.subtractInPlace(offset);
+    }
+  }
+
+  /**
    * Update LOD system based on player position
    */
   updateLOD(playerPosition) {
@@ -783,7 +822,10 @@ export class AssetManager {
     this.currentPlayerPosition = playerPosition;
 
     for (const [instance, lodData] of this.lodInstances) {
-      const distance = BABYLON.Vector3.Distance(playerPosition, instance.position);
+      const worldPos = (typeof instance.getAbsolutePosition === 'function')
+        ? instance.getAbsolutePosition()
+        : instance.position;
+      const distance = BABYLON.Vector3.Distance(playerPosition, worldPos);
 
       let newLodLevel;
       let shouldBeVisible = true;
@@ -1012,15 +1054,23 @@ export class AssetManager {
         url,
         this.scene,
         (container) => {
-          const meshes = container.meshes;
-          const root = meshes[0];
-          
+          // Add loaded content to the scene so transforms are computed
+          container.addAllToScene();
+
+          // Create a dedicated transform root and parent all container root nodes under it
+          const root = new BABYLON.TransformNode(`${name}_root`, this.scene);
+          for (const rn of container.rootNodes || []) {
+            rn.setParent(root);
+          }
+
+          // Disable all meshes in this model so only instances are visible
+          for (const m of container.meshes) {
+            if (m && m.setEnabled) m.setEnabled(false);
+          }
+
           // Store in assets
           this.assets[name] = root;
-          
-          // Initially disable
-          root.setEnabled(false);
-          
+
           console.log(`Loaded model: ${name}`);
           resolve(root);
         },
