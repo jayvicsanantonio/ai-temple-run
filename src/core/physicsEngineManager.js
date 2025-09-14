@@ -37,6 +37,8 @@ export class PhysicsEngineManager {
       targetLaneX: 0,
       baseY: 0.5,
       grounded: true,
+      ragdollActive: false,
+      rotVel: new BABYLON.Vector3(0, 0, 0),
     };
     this.obstacles = new Set();
     this.gravity = this.settings.gravity ?? -20;
@@ -137,6 +139,14 @@ export class PhysicsEngineManager {
     this.player.position.y += this.playerState.vel.y * dt;
     this.player.position.z += this.playerState.vel.z * dt;
 
+    // Ragdoll spin if active
+    if (this.playerState.ragdollActive) {
+      this.player.rotation.x += this.playerState.rotVel.x * dt;
+      this.player.rotation.z += this.playerState.rotVel.z * dt;
+      // add a bit of forward friction while ragdolling
+      this.playerState.vel.z = Math.max(0, this.playerState.vel.z - 5 * dt);
+    }
+
     // Ground detection (simple plane at baseY)
     if (this.player.position.y <= this.playerState.baseY) {
       this.player.position.y = this.playerState.baseY;
@@ -148,6 +158,16 @@ export class PhysicsEngineManager {
     } else {
       this.playerState.grounded = false;
     }
+  }
+
+  activateRagdoll() {
+    if (!this.player) return;
+    this.playerState.ragdollActive = true;
+    // Give a small pop and spin
+    this.playerState.vel.x += (Math.random() - 0.5) * 6;
+    this.playerState.vel.y = Math.max(this.playerState.vel.y, 5);
+    this.playerState.rotVel.x = (Math.random() - 0.5) * 4;
+    this.playerState.rotVel.z = (Math.random() - 0.5) * 6;
   }
 
   // Physics-based collision check for SIMPLE engine using AABB vs AABB

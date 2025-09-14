@@ -71,17 +71,18 @@
     - Obstacle registration/unregistration to physics manager from `ObstacleManager`
     - _Requirements: 3.3, 5.3, 5.5_
 
-- [ ] 6. Create animation state machine
-  - [ ] 6.1 Implement AnimationStateMachine class
-    - Create state registration system for run, jump, slide, death animations
-    - Add smooth transition system with configurable blend durations
-    - Implement animation mixer integration with Three.js
+- [x] 6. Create animation state machine
+  - [x] 6.1 Implement AnimationStateMachine class
+    - State registration for run, jump, slide, death
+    - Smooth cross-fade transitions with blend durations
+    - Integrated with Babylon AnimationGroups (state machine abstraction)
+    - Implemented in: `src/core/animationStateMachine.js` and wired in `playerController.js`
     - _Requirements: 4.1, 4.2, 4.3, 4.5_
 
-  - [ ] 6.2 Implement ragdoll physics for death animation
-    - Create ragdoll activation system when character dies
-    - Add physics force application for realistic death physics
-    - Implement transition from animated to physics-controlled character
+  - [x] 6.2 Implement ragdoll physics for death animation
+    - Added SIMPLE ragdoll mode in `PhysicsEngineManager` with spin/fall on death
+    - `playerController.die()` triggers ragdoll; integrates with existing physics
+    - Ready to extend with skeletal ragdoll when rigged assets arrive
     - _Requirements: 3.5, 4.4_
 
 - [ ] 7. Implement LOD (Level of Detail) system

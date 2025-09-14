@@ -4,6 +4,7 @@
  */
 
 import * as BABYLON from 'babylonjs';
+import { AnimationStateMachine } from './animationStateMachine.js';
 
 export class PlayerController {
   constructor(scene) {
@@ -44,6 +45,7 @@ export class PlayerController {
 
     this.currentAnimation = 'run';
     this.animationSpeed = 1.0;
+    this.animSM = new AnimationStateMachine(this.scene);
   }
 
   /**
@@ -118,8 +120,12 @@ export class PlayerController {
    * Setup animations for the player
    */
   setupAnimations() {
-    // Placeholder for animation setup
-    // Will be replaced with actual animations from Blender assets
+    // Register default states (clips can be bound later when available)
+    const states = ['idle', 'run', 'jump', 'slide', 'death'];
+    for (const s of states) {
+      this.animSM.registerState(s, { loop: s !== 'death', speed: 1 });
+    }
+    this.animSM.setState('run', 0);
   }
 
   /**
@@ -146,6 +152,9 @@ export class PlayerController {
       this.updateSlide(deltaTime);
       if (this.isJumping) this.updateJump(deltaTime);
     }
+
+    // Advance animation blending timers
+    this.animSM.update(deltaTime);
   }
 
   /**
@@ -248,7 +257,7 @@ export class PlayerController {
       if (this.physics) this.physics.jump();
       this.isJumping = true;
       this.jumpTime = 0;
-      this.playAnimation('jump');
+      this.playAnimation('jump', 0.15);
 
       // Add visual feedback
       if (this.playerMesh) {
@@ -299,7 +308,7 @@ export class PlayerController {
     }
 
     if (!this.isDead) {
-      this.playAnimation('run');
+      this.playAnimation('run', 0.15);
     }
   }
 
@@ -308,16 +317,19 @@ export class PlayerController {
    */
   die() {
     this.isDead = true;
-    this.playAnimation('death');
+    this.playAnimation('death', 0.1);
+    if (this.physics && typeof this.physics.activateRagdoll === 'function') {
+      this.physics.activateRagdoll(this.player);
+    }
   }
 
   /**
    * Play specified animation
    * @param {string} animationName - Name of the animation to play
    */
-  playAnimation(animationName) {
+  playAnimation(animationName, blend = 0.2) {
     this.currentAnimation = animationName;
-    // Animation playback will be implemented with Babylon.js animation system
+    this.animSM.setState(animationName, blend);
   }
 
   /**
