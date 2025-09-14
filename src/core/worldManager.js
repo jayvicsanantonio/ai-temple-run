@@ -4,12 +4,14 @@
  */
 
 import * as BABYLON from 'babylonjs';
+import { AssetManager } from './assetManager.js';
 
 export class WorldManager {
-  constructor(scene, obstacleManager, coinManager) {
+  constructor(scene, obstacleManager, coinManager, assetManager) {
     this.scene = scene;
     this.obstacleManager = obstacleManager;
     this.coinManager = coinManager;
+    this.assetManager = assetManager;
     
     // Tile management
     this.tiles = [];
@@ -20,9 +22,16 @@ export class WorldManager {
     this.tilesBehind = 2; // Number of tiles to keep behind player
     this.lastTileZ = 0;
     
-    // Visual variety
-    this.tileTypes = ['straight', 'turn_left', 'turn_right'];
-    this.currentTileType = 'straight';
+    // Visual variety - using temple pathway models
+    this.tileTypes = ['pathwaySegment', 'curvedPath', 'intersection'];
+    this.currentTileType = 'pathwaySegment';
+
+    // Model variations for different tile types
+    this.tileModelMap = {
+      'pathwaySegment': 'pathwaySegment',
+      'curvedPath': 'curvedPath',
+      'intersection': 'intersection'
+    };
     
     // Difficulty parameters
     this.difficulty = 1.0;
@@ -82,52 +91,57 @@ export class WorldManager {
   }
 
   /**
-   * Create a single tile
+   * Create a single tile using temple models
    */
   createTile(name) {
     // Create parent container for the tile
     const tileContainer = new BABYLON.TransformNode(name, this.scene);
-    
-    // Create main path
-    const path = BABYLON.MeshBuilder.CreateBox(
-      `${name}_path`,
-      { width: this.tileWidth, height: 0.5, depth: this.tileLength },
-      this.scene
-    );
-    path.position.y = -0.25;
-    path.material = this.tileMaterials[0];
-    path.receiveShadows = true;
-    path.parent = tileContainer;
-    
-    // Add side decorations (walls/barriers)
-    const leftWall = BABYLON.MeshBuilder.CreateBox(
-      `${name}_leftWall`,
-      { width: 0.5, height: 2, depth: this.tileLength },
-      this.scene
-    );
-    leftWall.position.x = -this.tileWidth / 2 - 0.25;
-    leftWall.position.y = 1;
-    leftWall.material = this.tileMaterials[2];
-    leftWall.parent = tileContainer;
-    
-    const rightWall = BABYLON.MeshBuilder.CreateBox(
-      `${name}_rightWall`,
-      { width: 0.5, height: 2, depth: this.tileLength },
-      this.scene
-    );
-    rightWall.position.x = this.tileWidth / 2 + 0.25;
-    rightWall.position.y = 1;
-    rightWall.material = this.tileMaterials[2];
-    rightWall.parent = tileContainer;
-    
+
+    // Choose tile type for variety
+    const tileType = this.tileTypes[Math.floor(Math.random() * this.tileTypes.length)];
+    const modelName = this.tileModelMap[tileType];
+
+    // Try to get the temple pathway model, fallback to procedural if not available
+    const pathwayModel = this.assetManager?.getModel(modelName);
+
+    if (pathwayModel) {
+      // Use the GLB temple pathway model
+      const path = pathwayModel.createInstance(`${name}_path`);
+      path.scaling = new BABYLON.Vector3(1, 1, 1);
+      path.position.y = 0;
+      path.receiveShadows = true;
+      path.parent = tileContainer;
+
+      // Apply stone material if available
+      const stoneMaterial = this.assetManager?.getMaterial('castleWallSlates');
+      if (stoneMaterial) {
+        path.material = stoneMaterial;
+      }
+    } else {
+      // Fallback to procedural geometry
+      const path = BABYLON.MeshBuilder.CreateBox(
+        `${name}_path`,
+        { width: this.tileWidth, height: 0.5, depth: this.tileLength },
+        this.scene
+      );
+      path.position.y = -0.25;
+      path.material = this.tileMaterials[0];
+      path.receiveShadows = true;
+      path.parent = tileContainer;
+    }
+
+    // Add temple architecture elements (pillars, walls)
+    this.addTempleArchitecture(tileContainer, name);
+
     // Store tile data
     tileContainer.tileData = {
       active: false,
       obstacles: [],
       coins: [],
-      decorations: []
+      decorations: [],
+      tileType: tileType
     };
-    
+
     return tileContainer;
   }
 
@@ -186,33 +200,68 @@ export class WorldManager {
   }
 
   /**
-   * Add decorative elements to a tile
+   * Add temple architecture elements to a tile
+   */
+  addTempleArchitecture(tileContainer, name) {
+    const pillarModel = this.assetManager?.getModel('stonePillar');
+    const wallModel = this.assetManager?.getModel('wallSegment');
+
+    if (pillarModel) {
+      // Add stone pillars on sides
+      const leftPillar = pillarModel.createInstance(`${name}_leftPillar`);
+      leftPillar.position.x = -this.tileWidth / 2 - 1;
+      leftPillar.position.y = 0;
+      leftPillar.scaling = new BABYLON.Vector3(0.8, 1, 0.8);
+      leftPillar.parent = tileContainer;
+
+      const rightPillar = pillarModel.createInstance(`${name}_rightPillar`);
+      rightPillar.position.x = this.tileWidth / 2 + 1;
+      rightPillar.position.y = 0;
+      rightPillar.scaling = new BABYLON.Vector3(0.8, 1, 0.8);
+      rightPillar.parent = tileContainer;
+    } else {
+      // Fallback to procedural walls
+      const leftWall = BABYLON.MeshBuilder.CreateBox(
+        `${name}_leftWall`,
+        { width: 0.5, height: 2, depth: this.tileLength },
+        this.scene
+      );
+      leftWall.position.x = -this.tileWidth / 2 - 0.25;
+      leftWall.position.y = 1;
+      leftWall.material = this.tileMaterials[2];
+      leftWall.parent = tileContainer;
+
+      const rightWall = BABYLON.MeshBuilder.CreateBox(
+        `${name}_rightWall`,
+        { width: 0.5, height: 2, depth: this.tileLength },
+        this.scene
+      );
+      rightWall.position.x = this.tileWidth / 2 + 0.25;
+      rightWall.position.y = 1;
+      rightWall.material = this.tileMaterials[2];
+      rightWall.parent = tileContainer;
+    }
+  }
+
+  /**
+   * Add temple decorative elements to a tile
    */
   addDecorations(tile, zPosition) {
-    // Random chance to add decorations
-    if (Math.random() < 0.3) {
-      // Add pillars
-      const leftPillar = BABYLON.MeshBuilder.CreateCylinder(
-        `pillar_left_${zPosition}`,
-        { height: 3, diameter: 0.5 },
-        this.scene
-      );
-      leftPillar.position.x = -2.5;
-      leftPillar.position.y = 1.5;
-      leftPillar.position.z = zPosition + (Math.random() * 10 - 5);
-      leftPillar.material = this.tileMaterials[2];
-      tile.tileData.decorations.push(leftPillar);
-      
-      const rightPillar = BABYLON.MeshBuilder.CreateCylinder(
-        `pillar_right_${zPosition}`,
-        { height: 3, diameter: 0.5 },
-        this.scene
-      );
-      rightPillar.position.x = 2.5;
-      rightPillar.position.y = 1.5;
-      rightPillar.position.z = zPosition + (Math.random() * 10 - 5);
-      rightPillar.material = this.tileMaterials[2];
-      tile.tileData.decorations.push(rightPillar);
+    // Random chance to add temple decorations
+    if (Math.random() < 0.4) {
+      const decorationModels = ['templeTree', 'mossStone', 'carvedSymbol'];
+      const randomDecoration = decorationModels[Math.floor(Math.random() * decorationModels.length)];
+      const decorationModel = this.assetManager?.getModel(randomDecoration);
+
+      if (decorationModel) {
+        // Add temple decoration on one side
+        const decoration = decorationModel.createInstance(`decoration_${zPosition}_${randomDecoration}`);
+        decoration.position.x = Math.random() > 0.5 ? -3.5 : 3.5;
+        decoration.position.y = 0;
+        decoration.position.z = zPosition + (Math.random() * 10 - 5);
+        decoration.scaling = new BABYLON.Vector3(0.6, 0.6, 0.6);
+        tile.tileData.decorations.push(decoration);
+      }
     }
   }
 
