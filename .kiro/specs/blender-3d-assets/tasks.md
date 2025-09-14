@@ -34,7 +34,7 @@
 
 ## Phase 3: Update Game Integration
 
-- [ ] 8. Update assetManager.js for GLB loading
+- [x] 8. Update assetManager.js for GLB loading
   - Replace procedural geometry with GLB model loading
   - Implement asset preloading from `/public/assets/models/`
   - Add texture loading from `/public/assets/textures/`
