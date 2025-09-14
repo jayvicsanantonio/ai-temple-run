@@ -53,10 +53,19 @@ const defaultConfig = {
 
   // PolyHaven integration settings (placeholders for future steps)
   polyHaven: {
+    mode: 'LIVE', // LIVE | MOCK
     baseUrl: 'https://api.polyhaven.com',
+    cdnBaseUrl: 'https://dl.polyhaven.org',
     defaultResolution: '2k',
     defaultFormat: 'jpg', // jpg | png | exr (depending on endpoint support)
     cacheTextures: true,
+    templates: {
+      // Optional override for texture URLs
+      // texture: '{cdnBase}/file/ph-assets/Textures/{resolution}/{id}/{id}_{type}.{format}',
+    },
+    apiPaths: {
+      search: '/assets',
+    },
   },
 };
 

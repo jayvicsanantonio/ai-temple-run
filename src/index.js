@@ -15,6 +15,7 @@ import { UIManager } from './core/uiManager.js';
 import { getConfig } from './core/config.js';
 import { BlenderMCPManager } from './core/blenderMCPManager.js';
 import { Hyper3DIntegration } from './core/hyper3dIntegration.js';
+import { PolyHavenIntegration } from './core/polyHavenIntegration.js';
 import { InputHandler } from './utils/inputHandler.js';
 
 // Import styles
@@ -36,6 +37,7 @@ class TempleRunGame {
     this.config = null;
     this.mcpManager = null;
     this.hyper3d = null;
+    this.polyHaven = null;
 
     // Game state
     this.isPlaying = false;
@@ -88,6 +90,9 @@ class TempleRunGame {
 
     // Initialize Hyper3D integration (no automatic generation here)
     this.hyper3d = new Hyper3DIntegration(this.assetManager, this.mcpManager, this.config);
+
+    // Initialize PolyHaven integration
+    this.polyHaven = new PolyHavenIntegration(this.assetManager, this.config);
 
     console.log('Game initialized successfully!');
   }

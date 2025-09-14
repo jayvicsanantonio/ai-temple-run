@@ -29,17 +29,16 @@
     - Debug prompt + button in HUD triggers generation/poll/import
     - Integrates imported model by replacing player mesh
 
-- [ ] 3. Implement PolyHaven texture integration
-  - [ ] 3.1 Create PolyHavenIntegration class for texture management
-    - Implement searchTextures method for category-based texture discovery
-    - Add downloadTexture method with resolution and format options
-    - Create texture caching system to avoid redundant downloads
+- [x] 3. Implement PolyHaven texture integration
+  - [x] 3.1 Create PolyHavenIntegration class for texture management
+    - Added `searchTextures`, `downloadTexture` with resolution/format, and caching
+    - Implemented in: `src/core/polyHavenIntegration.js`
     - _Requirements: 2.1, 2.4_
 
-  - [ ] 3.2 Implement texture application system
-    - Create applyTextureToObject method for material assignment
-    - Add support for multiple texture types (diffuse, normal, roughness)
-    - Implement texture atlas creation for performance optimization
+  - [x] 3.2 Implement texture application system
+    - Added `applyTextureToObject` using Babylon PBR material
+    - Supports albedo/diffuse, normal, roughness (with canvas composition)
+    - Included simple texture atlas builder `createTextureAtlas`
     - _Requirements: 2.1, 2.4, 2.5_
 
 - [ ] 4. Create GLB export pipeline
