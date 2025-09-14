@@ -24,7 +24,7 @@
   - Search for: "stone", "marble", "brick" categories
   - Download 1k-2k resolution to `/public/assets/textures/stone/`
 
-- [ ] 6. Download metal textures from PolyHaven
+- [x] 6. Download metal textures from PolyHaven
   - Search for: "metal", "gold", "bronze" categories
   - Download 1k resolution to `/public/assets/textures/metal/`
 
