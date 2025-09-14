@@ -91,6 +91,11 @@ class TempleRunGame {
       if (this.config.debug) {
         console.log('[Game] MCP status event:', status);
       }
+      // Show brief status banner for connection issues
+      if (this.uiManager && status) {
+        const level = status === 'connected' ? 'info' : status === 'error' ? 'warn' : 'info';
+        this.uiManager.showStatusBanner(`MCP: ${status}`, level, 1500);
+      }
     });
     if (this.config.mcp.enabled && this.config.mcp.connectOnStart) {
       this.mcpManager.connect().catch((err) => {

@@ -26,6 +26,7 @@ export class UIManager {
 
     this.onPlayCallback = null;
     this.onRestartCallback = null;
+    this.elements.statusBanner = null;
   }
 
   /**
@@ -80,6 +81,7 @@ export class UIManager {
           <span id="h3d-status" class="hud-status"></span>
         </div>
       </div>
+      <div id="status-banner" class="status-banner hidden"></div>
     `;
     document.body.appendChild(gameUI);
     this.elements.gameUI = gameUI;
@@ -127,6 +129,7 @@ export class UIManager {
     this.elements.h3dPrompt = document.getElementById('h3d-prompt');
     this.elements.h3dGenerateBtn = document.getElementById('h3d-generate');
     this.elements.h3dStatus = document.getElementById('h3d-status');
+    this.elements.statusBanner = document.getElementById('status-banner');
 
     // Update high score display
     this.elements.highScoreDisplay.textContent = this.highScore;
@@ -195,6 +198,26 @@ export class UIManager {
    */
   hideGameUI() {
     this.elements.gameUI.classList.add('hidden');
+  }
+
+  /**
+   * Show a temporary status banner
+   */
+  showStatusBanner(text, level = 'info', timeoutMs = 2000) {
+    const el = this.elements.statusBanner;
+    if (!el) return;
+    el.textContent = text;
+    el.classList.remove('hidden');
+    el.classList.remove('info', 'warn', 'error');
+    el.classList.add(level);
+    if (this._bannerTimer) clearTimeout(this._bannerTimer);
+    this._bannerTimer = setTimeout(() => this.hideStatusBanner(), timeoutMs);
+  }
+
+  hideStatusBanner() {
+    const el = this.elements.statusBanner;
+    if (!el) return;
+    el.classList.add('hidden');
   }
 
   /**

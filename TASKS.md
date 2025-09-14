@@ -111,17 +111,17 @@
     - Note: Three.js GLTFLoader replaced with Babylon loader in this project
     - _Requirements: 2.2, 6.3, 6.5_
 
-- [ ] 9. Implement error handling and fallback systems
-  - [ ] 9.1 Create comprehensive error handling classes
-    - Implement AssetLoadingError, PhysicsEngineError, and BlenderMCPError classes
-    - Add graceful degradation to placeholder geometry when assets fail
-    - Create error logging and debugging system
+- [x] 9. Implement error handling and fallback systems
+  - [x] 9.1 Create comprehensive error handling classes
+    - Added `AssetLoadingError`, `PhysicsEngineError` in `src/utils/errors.js` (BlenderMCPError already present)
+    - Graceful degradation to placeholder meshes in `AssetManager.createPlaceholderMesh`
+    - Basic logger with ring buffer in `src/utils/logger.js`
     - _Requirements: 1.3, 3.1, 5.5_
 
-  - [ ] 9.2 Implement fallback and recovery mechanisms
-    - Add automatic fallback to simple collision when physics fails
-    - Implement asset retry logic with exponential backoff
-    - Create user feedback system for connection and generation issues
+  - [x] 9.2 Implement fallback and recovery mechanisms
+    - Physics auto-fallback to SIMPLE already implemented; now adds status banner feedback
+    - Asset loading retries with exponential backoff + placeholder fallback
+    - UI status banner for MCP connection and generation issues
     - _Requirements: 3.1, 5.5, 6.4_
 
 - [ ] 10. Integrate all systems into game engine

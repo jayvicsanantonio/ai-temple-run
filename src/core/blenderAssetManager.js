@@ -98,7 +98,21 @@ export class BlenderAssetManager {
       action: async () => {
         rec.status = 'loading';
         rec.updatedAt = this._now();
-        const root = await this.assetManager.loadGLBModel(url, name);
+        let root = null;
+        try {
+          root = await this.assetManager.loadGLBModelWithRetry(url, name, {
+            retries: 3,
+            initialDelayMs: 500,
+            factor: 1.8,
+            jitter: 0.25,
+            fallbackPlaceholder: true,
+          });
+        } catch (err) {
+          // loadGLBModelWithRetry throws only when fallback disabled; mark as failed
+          rec.status = 'failed';
+          rec.updatedAt = this._now();
+          throw err;
+        }
         this.cache.set(name, {
           root,
           refCount: 1,

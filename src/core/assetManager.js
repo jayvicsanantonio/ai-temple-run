@@ -5,6 +5,8 @@
 
 import * as BABYLON from 'babylonjs';
 import 'babylonjs-loaders';
+import { AssetLoadingError } from '../utils/errors.js';
+import { defaultLogger as logger } from '../utils/logger.js';
 
 export class AssetManager {
   constructor(scene) {
@@ -21,17 +23,17 @@ export class AssetManager {
    */
   async init() {
     this.isLoading = true;
-    
+
     try {
       // Create procedural assets for now
       await this.createProceduralAssets();
-      
+
       // Setup materials
       this.createMaterials();
-      
+
       console.log('All assets loaded successfully');
     } catch (error) {
-      console.error('Error loading assets:', error);
+      logger.error(error, { where: 'AssetManager.init' });
     } finally {
       this.isLoading = false;
       this.loadingProgress = 100;
@@ -44,13 +46,13 @@ export class AssetManager {
   async createProceduralAssets() {
     // Create player character
     this.createPlayerCharacter();
-    
+
     // Create obstacle variations
     this.createObstacles();
-    
+
     // Create coin model
     this.createCoin();
-    
+
     // Create environment decorations
     this.createDecorations();
   }
@@ -60,7 +62,7 @@ export class AssetManager {
    */
   createPlayerCharacter() {
     const playerGroup = new BABYLON.TransformNode('playerModel', this.scene);
-    
+
     // Body
     const body = BABYLON.MeshBuilder.CreateBox(
       'playerBody',
@@ -69,16 +71,12 @@ export class AssetManager {
     );
     body.position.y = 0.5;
     body.parent = playerGroup;
-    
+
     // Head
-    const head = BABYLON.MeshBuilder.CreateSphere(
-      'playerHead',
-      { diameter: 0.4 },
-      this.scene
-    );
+    const head = BABYLON.MeshBuilder.CreateSphere('playerHead', { diameter: 0.4 }, this.scene);
     head.position.y = 1.2;
     head.parent = playerGroup;
-    
+
     // Arms
     const leftArm = BABYLON.MeshBuilder.CreateCylinder(
       'leftArm',
@@ -89,7 +87,7 @@ export class AssetManager {
     leftArm.position.y = 0.6;
     leftArm.rotation.z = Math.PI / 8;
     leftArm.parent = playerGroup;
-    
+
     const rightArm = BABYLON.MeshBuilder.CreateCylinder(
       'rightArm',
       { height: 0.6, diameter: 0.15 },
@@ -99,7 +97,7 @@ export class AssetManager {
     rightArm.position.y = 0.6;
     rightArm.rotation.z = -Math.PI / 8;
     rightArm.parent = playerGroup;
-    
+
     // Legs
     const leftLeg = BABYLON.MeshBuilder.CreateCylinder(
       'leftLeg',
@@ -109,7 +107,7 @@ export class AssetManager {
     leftLeg.position.x = -0.15;
     leftLeg.position.y = -0.05;
     leftLeg.parent = playerGroup;
-    
+
     const rightLeg = BABYLON.MeshBuilder.CreateCylinder(
       'rightLeg',
       { height: 0.7, diameter: 0.2 },
@@ -118,19 +116,19 @@ export class AssetManager {
     rightLeg.position.x = 0.15;
     rightLeg.position.y = -0.05;
     rightLeg.parent = playerGroup;
-    
+
     // Apply material
     const playerMat = new BABYLON.StandardMaterial('playerMat', this.scene);
     playerMat.diffuseColor = new BABYLON.Color3(0.2, 0.5, 0.9);
     playerMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
-    
+
     body.material = playerMat;
     head.material = playerMat;
     leftArm.material = playerMat;
     rightArm.material = playerMat;
     leftLeg.material = playerMat;
     rightLeg.material = playerMat;
-    
+
     playerGroup.setEnabled(false);
     this.assets.player = playerGroup;
   }
@@ -141,22 +139,18 @@ export class AssetManager {
   createObstacles() {
     // Log obstacle
     const logGroup = new BABYLON.TransformNode('logObstacle', this.scene);
-    const log = BABYLON.MeshBuilder.CreateCylinder(
-      'log',
-      { height: 3, diameter: 0.8 },
-      this.scene
-    );
+    const log = BABYLON.MeshBuilder.CreateCylinder('log', { height: 3, diameter: 0.8 }, this.scene);
     log.rotation.z = Math.PI / 2;
     log.position.y = 0.4;
     log.parent = logGroup;
-    
+
     const logMat = new BABYLON.StandardMaterial('logMat', this.scene);
     logMat.diffuseColor = new BABYLON.Color3(0.4, 0.25, 0.1);
     log.material = logMat;
-    
+
     logGroup.setEnabled(false);
     this.assets.logObstacle = logGroup;
-    
+
     // Rock obstacle
     const rockGroup = new BABYLON.TransformNode('rockObstacle', this.scene);
     const rock = BABYLON.MeshBuilder.CreateSphere(
@@ -167,14 +161,14 @@ export class AssetManager {
     rock.position.y = 0.6;
     rock.scaling = new BABYLON.Vector3(1, 1.2, 1);
     rock.parent = rockGroup;
-    
+
     const rockMat = new BABYLON.StandardMaterial('rockMat', this.scene);
     rockMat.diffuseColor = new BABYLON.Color3(0.4, 0.4, 0.4);
     rock.material = rockMat;
-    
+
     rockGroup.setEnabled(false);
     this.assets.rockObstacle = rockGroup;
-    
+
     // Spike obstacle
     const spikeGroup = new BABYLON.TransformNode('spikeObstacle', this.scene);
     for (let i = 0; i < 3; i++) {
@@ -186,12 +180,12 @@ export class AssetManager {
       spike.position.x = (i - 1) * 0.5;
       spike.position.y = 0.75;
       spike.parent = spikeGroup;
-      
+
       const spikeMat = new BABYLON.StandardMaterial(`spikeMat_${i}`, this.scene);
       spikeMat.diffuseColor = new BABYLON.Color3(0.6, 0.6, 0.6);
       spike.material = spikeMat;
     }
-    
+
     spikeGroup.setEnabled(false);
     this.assets.spikeObstacle = spikeGroup;
   }
@@ -201,7 +195,7 @@ export class AssetManager {
    */
   createCoin() {
     const coinGroup = new BABYLON.TransformNode('coinModel', this.scene);
-    
+
     // Main coin body
     const coin = BABYLON.MeshBuilder.CreateCylinder(
       'coin',
@@ -210,7 +204,7 @@ export class AssetManager {
     );
     coin.rotation.x = Math.PI / 2;
     coin.parent = coinGroup;
-    
+
     // Inner ring for detail
     const innerRing = BABYLON.MeshBuilder.CreateTorus(
       'coinRing',
@@ -218,17 +212,17 @@ export class AssetManager {
       this.scene
     );
     innerRing.parent = coinGroup;
-    
+
     // Gold material
     const goldMat = new BABYLON.StandardMaterial('goldMat', this.scene);
     goldMat.diffuseColor = new BABYLON.Color3(1, 0.84, 0);
     goldMat.specularColor = new BABYLON.Color3(1, 1, 1);
     goldMat.emissiveColor = new BABYLON.Color3(0.3, 0.25, 0);
     goldMat.specularPower = 128;
-    
+
     coin.material = goldMat;
     innerRing.material = goldMat;
-    
+
     coinGroup.setEnabled(false);
     this.assets.coin = coinGroup;
   }
@@ -239,14 +233,14 @@ export class AssetManager {
   createDecorations() {
     // Temple pillar
     const pillarGroup = new BABYLON.TransformNode('pillarDecoration', this.scene);
-    
+
     const base = BABYLON.MeshBuilder.CreateBox(
       'pillarBase',
       { width: 1, height: 0.3, depth: 1 },
       this.scene
     );
     base.parent = pillarGroup;
-    
+
     const column = BABYLON.MeshBuilder.CreateCylinder(
       'pillarColumn',
       { height: 4, diameter: 0.6 },
@@ -254,7 +248,7 @@ export class AssetManager {
     );
     column.position.y = 2.15;
     column.parent = pillarGroup;
-    
+
     const top = BABYLON.MeshBuilder.CreateBox(
       'pillarTop',
       { width: 1.2, height: 0.4, depth: 1.2 },
@@ -262,19 +256,19 @@ export class AssetManager {
     );
     top.position.y = 4.3;
     top.parent = pillarGroup;
-    
+
     const stoneMat = new BABYLON.StandardMaterial('stoneMat', this.scene);
     stoneMat.diffuseColor = new BABYLON.Color3(0.5, 0.45, 0.4);
     base.material = stoneMat;
     column.material = stoneMat;
     top.material = stoneMat;
-    
+
     pillarGroup.setEnabled(false);
     this.assets.pillar = pillarGroup;
-    
+
     // Tree
     const treeGroup = new BABYLON.TransformNode('treeDecoration', this.scene);
-    
+
     const trunk = BABYLON.MeshBuilder.CreateCylinder(
       'trunk',
       { height: 2, diameterBottom: 0.4, diameterTop: 0.3 },
@@ -282,7 +276,7 @@ export class AssetManager {
     );
     trunk.position.y = 1;
     trunk.parent = treeGroup;
-    
+
     const leaves = BABYLON.MeshBuilder.CreateSphere(
       'leaves',
       { diameter: 2, segments: 8 },
@@ -291,15 +285,15 @@ export class AssetManager {
     leaves.position.y = 2.5;
     leaves.scaling = new BABYLON.Vector3(1, 1.2, 1);
     leaves.parent = treeGroup;
-    
+
     const trunkMat = new BABYLON.StandardMaterial('trunkMat', this.scene);
     trunkMat.diffuseColor = new BABYLON.Color3(0.3, 0.2, 0.1);
     trunk.material = trunkMat;
-    
+
     const leavesMat = new BABYLON.StandardMaterial('leavesMat', this.scene);
     leavesMat.diffuseColor = new BABYLON.Color3(0.2, 0.5, 0.1);
     leaves.material = leavesMat;
-    
+
     treeGroup.setEnabled(false);
     this.assets.tree = treeGroup;
   }
@@ -314,13 +308,13 @@ export class AssetManager {
     pathMat.specularColor = new BABYLON.Color3(0, 0, 0);
     pathMat.bumpTexture = this.createProceduralTexture('bump');
     this.materials.path = pathMat;
-    
+
     // Grass material
     const grassMat = new BABYLON.StandardMaterial('grassMaterial', this.scene);
     grassMat.diffuseColor = new BABYLON.Color3(0.25, 0.45, 0.15);
     grassMat.specularColor = new BABYLON.Color3(0, 0, 0);
     this.materials.grass = grassMat;
-    
+
     // Stone material
     const stoneMat = new BABYLON.StandardMaterial('stoneMaterial', this.scene);
     stoneMat.diffuseColor = new BABYLON.Color3(0.45, 0.4, 0.35);
@@ -337,9 +331,9 @@ export class AssetManager {
       { width: 256, height: 256 },
       this.scene
     );
-    
+
     const context = texture.getContext();
-    
+
     if (type === 'bump') {
       // Create a simple noise pattern
       for (let x = 0; x < 256; x += 4) {
@@ -350,7 +344,7 @@ export class AssetManager {
         }
       }
     }
-    
+
     texture.update();
     return texture;
   }
@@ -379,37 +373,89 @@ export class AssetManager {
         (container) => {
           const meshes = container.meshes;
           const root = meshes[0];
-          
+
           // Store in assets
           this.assets[name] = root;
-          
+
           // Initially disable
           root.setEnabled(false);
-          
+
           console.log(`Loaded model: ${name}`);
           resolve(root);
         },
         (event) => {
           // Progress callback
-          const percentage = event.loaded / event.total * 100;
+          const percentage = event.total ? (event.loaded / event.total) * 100 : 0;
           this.loadingProgress = percentage;
         },
         (scene, message, exception) => {
-          console.error(`Error loading ${name}:`, message);
-          reject(new Error(message));
+          const err = new AssetLoadingError(`Failed to load ${name}`, {
+            cause: exception || message,
+            context: { url, name },
+          });
+          logger.error(err, { where: 'AssetManager.loadGLBModel' });
+          reject(err);
         }
       );
     });
   }
 
   /**
+   * Load a GLB with retries and an optional placeholder fallback on failure.
+   */
+  async loadGLBModelWithRetry(
+    url,
+    name,
+    {
+      retries = 3,
+      initialDelayMs = 400,
+      factor = 1.8,
+      jitter = 0.25,
+      fallbackPlaceholder = true,
+    } = {}
+  ) {
+    let attempt = 0;
+    let delay = initialDelayMs;
+    while (attempt <= retries) {
+      try {
+        return await this.loadGLBModel(url, name);
+      } catch (err) {
+        attempt += 1;
+        if (attempt > retries) {
+          if (fallbackPlaceholder) {
+            const ph = this.createPlaceholderMesh(name);
+            this.assets[name] = ph;
+            return ph;
+          }
+          throw err;
+        }
+        await new Promise((r) => setTimeout(r, Math.floor(delay + Math.random() * delay * jitter)));
+        delay = Math.floor(delay * factor);
+      }
+    }
+  }
+
+  /**
+   * Create a simple placeholder mesh for failed loads.
+   */
+  createPlaceholderMesh(
+    name = 'placeholder',
+    { size = 1, color = new BABYLON.Color3(1, 0, 0) } = {}
+  ) {
+    const box = BABYLON.MeshBuilder.CreateBox(name, { size }, this.scene);
+    const mat = new BABYLON.StandardMaterial(`${name}_mat`, this.scene);
+    mat.diffuseColor = color;
+    box.material = mat;
+    box.setEnabled(false);
+    return box;
+  }
+
+  /**
    * Preload assets from URLs
    */
   async preloadAssets(assetList) {
-    const loadPromises = assetList.map(asset => 
-      this.loadGLBModel(asset.url, asset.name)
-    );
-    
+    const loadPromises = assetList.map((asset) => this.loadGLBModel(asset.url, asset.name));
+
     try {
       await Promise.all(loadPromises);
       console.log('All external assets loaded');
