@@ -75,24 +75,7 @@ export class UIManager {
           <span class="hud-label">Distance</span>
           <span id="distance-display" class="hud-value">0m</span>
         </div>
-        <div class="hud-item hud-debug">
-          <input id="h3d-prompt" class="hud-input" placeholder="Hyper3D prompt" />
-          <button id="h3d-generate" class="ui-button small">Gen 3D</button>
-          <span id="h3d-status" class="hud-status"></span>
-        </div>
-        <div class="hud-item hud-debug">
-          <label class="hud-label">Character</label>
-          <select id="char-mode" class="hud-select">
-            <option value="PROCEDURAL">Procedural</option>
-            <option value="GLB">GLB</option>
-            <option value="HYPER3D">Hyper3D</option>
-          </select>
-          <input id="char-glb-url" class="hud-input" placeholder="/models/player.glb" />
-          <input id="char-prompt" class="hud-input" placeholder="runner prompt" />
-          <button id="char-apply" class="ui-button small">Apply</button>
-        </div>
       </div>
-      <div id="status-banner" class="status-banner hidden"></div>
     `;
     document.body.appendChild(gameUI);
     this.elements.gameUI = gameUI;
@@ -136,15 +119,7 @@ export class UIManager {
     this.elements.finalScoreDisplay = document.getElementById('final-score');
     this.elements.playButton = document.getElementById('play-button');
     this.elements.restartButton = document.getElementById('restart-button');
-    // Debug elements
-    this.elements.h3dPrompt = document.getElementById('h3d-prompt');
-    this.elements.h3dGenerateBtn = document.getElementById('h3d-generate');
-    this.elements.h3dStatus = document.getElementById('h3d-status');
-    this.elements.statusBanner = document.getElementById('status-banner');
-    this.elements.charMode = document.getElementById('char-mode');
-    this.elements.charGlbUrl = document.getElementById('char-glb-url');
-    this.elements.charPrompt = document.getElementById('char-prompt');
-    this.elements.charApply = document.getElementById('char-apply');
+    // No debug elements
 
     // Update high score display
     this.elements.highScoreDisplay.textContent = this.highScore;
@@ -171,29 +146,7 @@ export class UIManager {
       }
     });
 
-    if (this.elements.h3dGenerateBtn) {
-      this.elements.h3dGenerateBtn.addEventListener('click', () => {
-        const prompt = this.elements.h3dPrompt ? this.elements.h3dPrompt.value : '';
-        if (this.onHyper3DGenerate) {
-          const updateStatus = (text) => {
-            if (this.elements.h3dStatus) this.elements.h3dStatus.textContent = text || '';
-          };
-          updateStatus('Starting...');
-          this.onHyper3DGenerate(prompt, updateStatus);
-        }
-      });
-    }
-
-    if (this.elements.charApply) {
-      this.elements.charApply.addEventListener('click', () => {
-        if (this.onCharacterModeChange) {
-          const mode = this.elements.charMode?.value || 'PROCEDURAL';
-          const glbUrl = this.elements.charGlbUrl?.value || '';
-          const prompt = this.elements.charPrompt?.value || '';
-          this.onCharacterModeChange({ mode, glbUrl, prompt });
-        }
-      });
-    }
+    // No debug event listeners
   }
 
   /**
@@ -226,25 +179,7 @@ export class UIManager {
     this.elements.gameUI.classList.add('hidden');
   }
 
-  /**
-   * Show a temporary status banner
-   */
-  showStatusBanner(text, level = 'info', timeoutMs = 2000) {
-    const el = this.elements.statusBanner;
-    if (!el) return;
-    el.textContent = text;
-    el.classList.remove('hidden');
-    el.classList.remove('info', 'warn', 'error');
-    el.classList.add(level);
-    if (this._bannerTimer) clearTimeout(this._bannerTimer);
-    this._bannerTimer = setTimeout(() => this.hideStatusBanner(), timeoutMs);
-  }
-
-  hideStatusBanner() {
-    const el = this.elements.statusBanner;
-    if (!el) return;
-    el.classList.add('hidden');
-  }
+  // Debug status banner removed
 
   /**
    * Show game over screen
@@ -335,21 +270,7 @@ export class UIManager {
     this.onRestartCallback = callback;
   }
 
-  /**
-   * Set Hyper3D generate button callback
-   * @param {(prompt: string, updateStatus: (text:string)=>void) => void} callback
-   */
-  setOnHyper3DGenerateCallback(callback) {
-    this.onHyper3DGenerate = callback;
-  }
-
-  /**
-   * Set Character Mode change callback
-   * @param {(opts: {mode:string, glbUrl?: string, prompt?: string}) => void} callback
-   */
-  setOnCharacterModeChangeCallback(callback) {
-    this.onCharacterModeChange = callback;
-  }
+  // Debug callback setters removed
 
   /**
    * Load high score from local storage

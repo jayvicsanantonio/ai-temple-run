@@ -92,11 +92,6 @@ class TempleRunGame {
       if (this.config.debug) {
         console.log('[Game] MCP status event:', status);
       }
-      // Show brief status banner for connection issues
-      if (this.uiManager && status) {
-        const level = status === 'connected' ? 'info' : status === 'error' ? 'warn' : 'info';
-        this.uiManager.showStatusBanner(`MCP: ${status}`, level, 1500);
-      }
     });
     if (this.config.mcp.enabled && this.config.mcp.connectOnStart) {
       this.mcpManager.connect().catch((err) => {
@@ -246,7 +241,6 @@ class TempleRunGame {
     try {
       const mode = (cfg.character?.mode || 'PROCEDURAL').toUpperCase();
       if (mode === 'GLB' && cfg.character?.glbUrl) {
-        this.uiManager?.showStatusBanner('Loading character...', 'info', 1500);
         const root = await this.blenderAssets.enqueueGLB({
           url: cfg.character.glbUrl,
           name: cfg.character.name || 'player_glb',
@@ -255,10 +249,8 @@ class TempleRunGame {
         if (root) {
           this.playerController.setPlayerMesh(root);
           this.assetOptimizer?.tryApplyLODs(root);
-          this.uiManager?.showStatusBanner('Character ready', 'info', 1200);
         }
       } else if (mode === 'HYPER3D' && this.hyper3d) {
-        this.uiManager?.showStatusBanner('Generating character...', 'info', 1500);
         const root = await this.blenderAssets.generateCharacterAndImport(
           cfg.character?.prompt || 'stylized runner',
           { name: cfg.character?.name || 'player_h3d' }
@@ -266,21 +258,16 @@ class TempleRunGame {
         if (root) {
           this.playerController.setPlayerMesh(root);
           this.assetOptimizer?.tryApplyLODs(root);
-          this.uiManager?.showStatusBanner('Character ready', 'info', 1200);
-        } else {
-          this.uiManager?.showStatusBanner('Character fallback used', 'warn', 1800);
         }
       }
     } catch (e) {
       console.warn('Character asset pipeline error:', e);
-      this.uiManager?.showStatusBanner('Character failed; using placeholder', 'warn', 2000);
     }
 
     // Obstacles
     try {
       const list = cfg.obstacles?.list || [];
       if (list.length) {
-        this.uiManager?.showStatusBanner('Loading obstacles...', 'info', 1200);
         await Promise.all(
           list.map((o) =>
             this.blenderAssets
@@ -291,11 +278,9 @@ class TempleRunGame {
         // Provide AssetManager and prefab names to obstacle manager
         this.obstacleManager.setAssetManager?.(this.assetManager);
         this.obstacleManager.setObstaclePrefabs?.(list.map((o) => o.name));
-        this.uiManager?.showStatusBanner('Obstacles ready', 'info', 1200);
       }
     } catch (e) {
       console.warn('Obstacle asset pipeline error:', e);
-      this.uiManager?.showStatusBanner('Obstacle load failed; using primitives', 'warn', 2000);
     }
   }
 
@@ -338,37 +323,7 @@ class TempleRunGame {
   setupUICallbacks() {
     this.uiManager.setOnPlayCallback(() => this.startGame());
     this.uiManager.setOnRestartCallback(() => this.restartGame());
-    // Hyper3D debug generate button
-    this.uiManager.setOnHyper3DGenerateCallback(async (prompt, updateStatus) => {
-      try {
-        const text = prompt && prompt.trim().length > 0 ? prompt.trim() : 'stylized runner';
-        updateStatus('Submitting job...');
-        const { id } = await this.hyper3d.generateCharacterFromText(text, {
-          bboxCondition: this.config?.hyper3d?.defaultBboxCondition || null,
-        });
-        updateStatus('Polling...');
-        const { status } = await this.hyper3d.pollJobStatus(id);
-        updateStatus(status);
-        if (status === 'Done') {
-          updateStatus('Importing...');
-          const mesh = await this.hyper3d.importCompletedAsset(id, { name: 'player_h3d' });
-          if (mesh) {
-            this.playerController.setPlayerMesh(mesh);
-            updateStatus('Ready');
-          } else {
-            updateStatus('Import failed');
-          }
-        }
-      } catch (err) {
-        console.warn('Hyper3D generate error:', err);
-        updateStatus('Error');
-      }
-    });
-
-    // Character mode apply
-    this.uiManager.setOnCharacterModeChangeCallback(async ({ mode, glbUrl, prompt }) => {
-      await this.switchCharacterMode(mode, { glbUrl, prompt });
-    });
+    // No debug UI callbacks
   }
 
   /**
@@ -386,7 +341,6 @@ class TempleRunGame {
         const placeholder = this.createPlayerPlaceholder();
         this.playerController.setPlayerMesh(placeholder);
         this.currentCharacterAssetName = null;
-        this.uiManager?.showStatusBanner('Using procedural character', 'info', 1200);
         return;
       }
       if (m === 'GLB' && this.config.gameAssets.character.glbUrl) {
@@ -403,7 +357,6 @@ class TempleRunGame {
           this.playerController.setPlayerMesh(root);
           this.assetOptimizer?.tryApplyLODs(root);
           this.currentCharacterAssetName = name;
-          this.uiManager?.showStatusBanner('Character ready (GLB)', 'info', 1200);
         }
         return;
       }
@@ -420,16 +373,15 @@ class TempleRunGame {
           this.playerController.setPlayerMesh(root);
           this.assetOptimizer?.tryApplyLODs(root);
           this.currentCharacterAssetName = name;
-          this.uiManager?.showStatusBanner('Character ready (Hyper3D)', 'info', 1200);
         } else {
-          this.uiManager?.showStatusBanner('Character generation failed', 'warn', 1800);
+          // generation failed; keep existing character
         }
         return;
       }
-      this.uiManager?.showStatusBanner('Unknown character mode', 'warn', 1500);
+      // Unknown mode: no-op
     } catch (e) {
       console.warn('switchCharacterMode error:', e);
-      this.uiManager?.showStatusBanner('Character switch failed', 'error', 1800);
+      // silent failure for debug-only switch
     }
   }
 
