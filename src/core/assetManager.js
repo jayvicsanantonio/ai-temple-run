@@ -20,12 +20,12 @@ export class AssetManager {
       pathways: 'models/pathways/',
       architecture: 'models/architecture/',
       obstacles: 'models/obstacles/',
-      decorations: 'models/decorations/'
+      decorations: 'models/decorations/',
     };
     this.texturePaths = {
       stone: 'textures/stone/',
       metal: 'textures/metal/',
-      organic: 'textures/organic/'
+      organic: 'textures/organic/',
     };
 
     // LOD system defaults
@@ -88,7 +88,15 @@ export class AssetManager {
       // Decoration models
       { path: 'decorations/temple_tree_with_vines.glb', name: 'tree' },
       { path: 'decorations/moss_covered_stone.glb', name: 'mossStone' },
-      { path: 'decorations/ancient_carved_symbol.glb', name: 'carvedSymbol' }
+      { path: 'decorations/ancient_carved_symbol.glb', name: 'carvedSymbol' },
+
+      // Additional temple assets
+      { path: 'temple_coin_collectible.glb', name: 'coin' },
+      { path: 'temple_complex_main.glb', name: 'templeComplex' },
+      { path: 'temple_crystal_formation.glb', name: 'crystalFormation' },
+      { path: 'temple_entrance_gate.glb', name: 'entranceGate' },
+      { path: 'temple_fountain.glb', name: 'fountain' },
+      { path: 'temple_vines.glb', name: 'vines' },
     ];
 
     const loadPromises = modelAssets.map(async (asset) => {
@@ -117,42 +125,28 @@ export class AssetManager {
    */
   async loadTextures() {
     const textureCategories = {
-      stone: [
-        'castle_wall_slates',
-        'broken_wall',
-        'dry_riverbed_rock',
-        'cliff_side',
-        'brick_wall'
-      ],
-      metal: [
-        'metal_plate',
-        'green_metal_rust',
-        'blue_metal_plate'
-      ],
-      organic: [
-        'bark_brown',
-        'brown_mud',
-        'fine_grained_wood'
-      ]
+      stone: ['castle_wall_slates', 'broken_wall', 'dry_riverbed_rock', 'cliff_side', 'brick_wall'],
+      metal: ['metal_plate', 'green_metal_rust', 'blue_metal_plate'],
+      organic: ['bark_brown', 'brown_mud', 'fine_grained_wood'],
     };
 
     // Some folders contain files with a different base prefix than the folder name
     const filePrefixAliases = {
       stone: {
-        brick_wall: 'brick_wall_001'
+        brick_wall: 'brick_wall_001',
       },
       organic: {
         bark_brown: 'bark_brown_02',
-        brown_mud: 'brown_mud_03'
-      }
+        brown_mud: 'brown_mud_03',
+      },
     };
 
     // Some materials may not include all texture types; override per material when needed
     const defaultTypes = ['Diffuse', 'nor_dx', 'Rough', 'AO', 'Displacement'];
     const typeOverrides = {
       organic: {
-        fine_grained_wood: ['Diffuse', 'nor_dx', 'Rough', 'AO'] // no Displacement in assets
-      }
+        fine_grained_wood: ['Diffuse', 'nor_dx', 'Rough', 'AO'], // no Displacement in assets
+      },
     };
 
     const loadPromises = [];
@@ -212,13 +206,13 @@ export class AssetManager {
   async createProceduralAssets() {
     // Create player character
     this.createPlayerCharacter();
-    
+
     // Create obstacle variations
     this.createObstacles();
-    
+
     // Create coin model
     this.createCoin();
-    
+
     // Create environment decorations
     this.createDecorations();
   }
@@ -228,7 +222,7 @@ export class AssetManager {
    */
   createPlayerCharacter() {
     const playerGroup = new BABYLON.TransformNode('playerModel', this.scene);
-    
+
     // Body
     const body = BABYLON.MeshBuilder.CreateBox(
       'playerBody',
@@ -237,16 +231,12 @@ export class AssetManager {
     );
     body.position.y = 0.5;
     body.parent = playerGroup;
-    
+
     // Head
-    const head = BABYLON.MeshBuilder.CreateSphere(
-      'playerHead',
-      { diameter: 0.4 },
-      this.scene
-    );
+    const head = BABYLON.MeshBuilder.CreateSphere('playerHead', { diameter: 0.4 }, this.scene);
     head.position.y = 1.2;
     head.parent = playerGroup;
-    
+
     // Arms
     const leftArm = BABYLON.MeshBuilder.CreateCylinder(
       'leftArm',
@@ -257,7 +247,7 @@ export class AssetManager {
     leftArm.position.y = 0.6;
     leftArm.rotation.z = Math.PI / 8;
     leftArm.parent = playerGroup;
-    
+
     const rightArm = BABYLON.MeshBuilder.CreateCylinder(
       'rightArm',
       { height: 0.6, diameter: 0.15 },
@@ -267,7 +257,7 @@ export class AssetManager {
     rightArm.position.y = 0.6;
     rightArm.rotation.z = -Math.PI / 8;
     rightArm.parent = playerGroup;
-    
+
     // Legs
     const leftLeg = BABYLON.MeshBuilder.CreateCylinder(
       'leftLeg',
@@ -277,7 +267,7 @@ export class AssetManager {
     leftLeg.position.x = -0.15;
     leftLeg.position.y = -0.05;
     leftLeg.parent = playerGroup;
-    
+
     const rightLeg = BABYLON.MeshBuilder.CreateCylinder(
       'rightLeg',
       { height: 0.7, diameter: 0.2 },
@@ -286,19 +276,19 @@ export class AssetManager {
     rightLeg.position.x = 0.15;
     rightLeg.position.y = -0.05;
     rightLeg.parent = playerGroup;
-    
+
     // Apply material
     const playerMat = new BABYLON.StandardMaterial('playerMat', this.scene);
     playerMat.diffuseColor = new BABYLON.Color3(0.2, 0.5, 0.9);
     playerMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
-    
+
     body.material = playerMat;
     head.material = playerMat;
     leftArm.material = playerMat;
     rightArm.material = playerMat;
     leftLeg.material = playerMat;
     rightLeg.material = playerMat;
-    
+
     playerGroup.setEnabled(false);
     this.assets.player = playerGroup;
   }
@@ -309,22 +299,18 @@ export class AssetManager {
   createObstacles() {
     // Log obstacle
     const logGroup = new BABYLON.TransformNode('logObstacle', this.scene);
-    const log = BABYLON.MeshBuilder.CreateCylinder(
-      'log',
-      { height: 3, diameter: 0.8 },
-      this.scene
-    );
+    const log = BABYLON.MeshBuilder.CreateCylinder('log', { height: 3, diameter: 0.8 }, this.scene);
     log.rotation.z = Math.PI / 2;
     log.position.y = 0.4;
     log.parent = logGroup;
-    
+
     const logMat = new BABYLON.StandardMaterial('logMat', this.scene);
     logMat.diffuseColor = new BABYLON.Color3(0.4, 0.25, 0.1);
     log.material = logMat;
-    
+
     logGroup.setEnabled(false);
     this.assets.logObstacle = logGroup;
-    
+
     // Rock obstacle
     const rockGroup = new BABYLON.TransformNode('rockObstacle', this.scene);
     const rock = BABYLON.MeshBuilder.CreateSphere(
@@ -335,14 +321,14 @@ export class AssetManager {
     rock.position.y = 0.6;
     rock.scaling = new BABYLON.Vector3(1, 1.2, 1);
     rock.parent = rockGroup;
-    
+
     const rockMat = new BABYLON.StandardMaterial('rockMat', this.scene);
     rockMat.diffuseColor = new BABYLON.Color3(0.4, 0.4, 0.4);
     rock.material = rockMat;
-    
+
     rockGroup.setEnabled(false);
     this.assets.rockObstacle = rockGroup;
-    
+
     // Spike obstacle
     const spikeGroup = new BABYLON.TransformNode('spikeObstacle', this.scene);
     for (let i = 0; i < 3; i++) {
@@ -354,12 +340,12 @@ export class AssetManager {
       spike.position.x = (i - 1) * 0.5;
       spike.position.y = 0.75;
       spike.parent = spikeGroup;
-      
+
       const spikeMat = new BABYLON.StandardMaterial(`spikeMat_${i}`, this.scene);
       spikeMat.diffuseColor = new BABYLON.Color3(0.6, 0.6, 0.6);
       spike.material = spikeMat;
     }
-    
+
     spikeGroup.setEnabled(false);
     this.assets.spikeObstacle = spikeGroup;
   }
@@ -369,7 +355,7 @@ export class AssetManager {
    */
   createCoin() {
     const coinGroup = new BABYLON.TransformNode('coinModel', this.scene);
-    
+
     // Main coin body
     const coin = BABYLON.MeshBuilder.CreateCylinder(
       'coin',
@@ -378,7 +364,7 @@ export class AssetManager {
     );
     coin.rotation.x = Math.PI / 2;
     coin.parent = coinGroup;
-    
+
     // Inner ring for detail
     const innerRing = BABYLON.MeshBuilder.CreateTorus(
       'coinRing',
@@ -386,17 +372,17 @@ export class AssetManager {
       this.scene
     );
     innerRing.parent = coinGroup;
-    
+
     // Gold material
     const goldMat = new BABYLON.StandardMaterial('goldMat', this.scene);
     goldMat.diffuseColor = new BABYLON.Color3(1, 0.84, 0);
     goldMat.specularColor = new BABYLON.Color3(1, 1, 1);
     goldMat.emissiveColor = new BABYLON.Color3(0.3, 0.25, 0);
     goldMat.specularPower = 128;
-    
+
     coin.material = goldMat;
     innerRing.material = goldMat;
-    
+
     coinGroup.setEnabled(false);
     this.assets.coin = coinGroup;
   }
@@ -407,14 +393,14 @@ export class AssetManager {
   createDecorations() {
     // Temple pillar
     const pillarGroup = new BABYLON.TransformNode('pillarDecoration', this.scene);
-    
+
     const base = BABYLON.MeshBuilder.CreateBox(
       'pillarBase',
       { width: 1, height: 0.3, depth: 1 },
       this.scene
     );
     base.parent = pillarGroup;
-    
+
     const column = BABYLON.MeshBuilder.CreateCylinder(
       'pillarColumn',
       { height: 4, diameter: 0.6 },
@@ -422,7 +408,7 @@ export class AssetManager {
     );
     column.position.y = 2.15;
     column.parent = pillarGroup;
-    
+
     const top = BABYLON.MeshBuilder.CreateBox(
       'pillarTop',
       { width: 1.2, height: 0.4, depth: 1.2 },
@@ -430,19 +416,19 @@ export class AssetManager {
     );
     top.position.y = 4.3;
     top.parent = pillarGroup;
-    
+
     const stoneMat = new BABYLON.StandardMaterial('stoneMat', this.scene);
     stoneMat.diffuseColor = new BABYLON.Color3(0.5, 0.45, 0.4);
     base.material = stoneMat;
     column.material = stoneMat;
     top.material = stoneMat;
-    
+
     pillarGroup.setEnabled(false);
     this.assets.pillar = pillarGroup;
-    
+
     // Tree
     const treeGroup = new BABYLON.TransformNode('treeDecoration', this.scene);
-    
+
     const trunk = BABYLON.MeshBuilder.CreateCylinder(
       'trunk',
       { height: 2, diameterBottom: 0.4, diameterTop: 0.3 },
@@ -450,7 +436,7 @@ export class AssetManager {
     );
     trunk.position.y = 1;
     trunk.parent = treeGroup;
-    
+
     const leaves = BABYLON.MeshBuilder.CreateSphere(
       'leaves',
       { diameter: 2, segments: 8 },
@@ -459,15 +445,15 @@ export class AssetManager {
     leaves.position.y = 2.5;
     leaves.scaling = new BABYLON.Vector3(1, 1.2, 1);
     leaves.parent = treeGroup;
-    
+
     const trunkMat = new BABYLON.StandardMaterial('trunkMat', this.scene);
     trunkMat.diffuseColor = new BABYLON.Color3(0.3, 0.2, 0.1);
     trunk.material = trunkMat;
-    
+
     const leavesMat = new BABYLON.StandardMaterial('leavesMat', this.scene);
     leavesMat.diffuseColor = new BABYLON.Color3(0.2, 0.5, 0.1);
     leaves.material = leavesMat;
-    
+
     treeGroup.setEnabled(false);
     this.assets.tree = treeGroup;
   }
@@ -493,9 +479,15 @@ export class AssetManager {
    * Create PBR materials for stone textures
    */
   createStoneMaterials() {
-    const stoneTextures = ['castle_wall_slates', 'broken_wall', 'dry_riverbed_rock', 'cliff_side', 'brick_wall'];
+    const stoneTextures = [
+      'castle_wall_slates',
+      'broken_wall',
+      'dry_riverbed_rock',
+      'cliff_side',
+      'brick_wall',
+    ];
 
-    stoneTextures.forEach(materialName => {
+    stoneTextures.forEach((materialName) => {
       const pbrMat = new BABYLON.PBRMaterial(`${materialName}_material`, this.scene);
 
       // Apply textures if available
@@ -536,7 +528,7 @@ export class AssetManager {
   createMetalMaterials() {
     const metalTextures = ['metal_plate', 'green_metal_rust', 'blue_metal_plate'];
 
-    metalTextures.forEach(materialName => {
+    metalTextures.forEach((materialName) => {
       const pbrMat = new BABYLON.PBRMaterial(`${materialName}_material`, this.scene);
 
       // Apply textures if available
@@ -577,7 +569,7 @@ export class AssetManager {
   createOrganicMaterials() {
     const organicTextures = ['bark_brown', 'brown_mud', 'fine_grained_wood'];
 
-    organicTextures.forEach(materialName => {
+    organicTextures.forEach((materialName) => {
       const pbrMat = new BABYLON.PBRMaterial(`${materialName}_material`, this.scene);
 
       // Apply textures if available
@@ -650,9 +642,9 @@ export class AssetManager {
       { width: 256, height: 256 },
       this.scene
     );
-    
+
     const context = texture.getContext();
-    
+
     if (type === 'bump') {
       // Create a simple noise pattern
       for (let x = 0; x < 256; x += 4) {
@@ -663,7 +655,7 @@ export class AssetManager {
         }
       }
     }
-    
+
     texture.update();
     return texture;
   }
@@ -727,7 +719,8 @@ export class AssetManager {
       }
 
       // Instance all descendant meshes and preserve world transforms
-      const descendants = typeof root.getChildMeshes === 'function' ? root.getChildMeshes(false) : [];
+      const descendants =
+        typeof root.getChildMeshes === 'function' ? root.getChildMeshes(false) : [];
       for (const child of descendants) {
         if (child && typeof child.getTotalVertices === 'function' && child.getTotalVertices() > 0) {
           child.computeWorldMatrix(true);
@@ -769,7 +762,10 @@ export class AssetManager {
         originalModel: model,
         lodLevel: 'high',
         isVisible: true,
-        position: (position && position.clone) ? position.clone() : (instance.position?.clone?.() || new BABYLON.Vector3(0, 0, 0))
+        position:
+          position && position.clone
+            ? position.clone()
+            : instance.position?.clone?.() || new BABYLON.Vector3(0, 0, 0),
       });
     }
 
@@ -787,8 +783,16 @@ export class AssetManager {
     if (!meshes || meshes.length === 0) return;
 
     // Compute world-space bounds across all child meshes
-    let min = new BABYLON.Vector3(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
-    let max = new BABYLON.Vector3(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
+    let min = new BABYLON.Vector3(
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY
+    );
+    let max = new BABYLON.Vector3(
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY
+    );
     for (const m of meshes) {
       if (!m || !m.getBoundingInfo) continue;
       m.computeWorldMatrix(true);
@@ -800,9 +804,10 @@ export class AssetManager {
     }
 
     const centerWorld = min.add(max).scale(0.5);
-    const containerWorld = (typeof container.getAbsolutePosition === 'function')
-      ? container.getAbsolutePosition()
-      : container.position;
+    const containerWorld =
+      typeof container.getAbsolutePosition === 'function'
+        ? container.getAbsolutePosition()
+        : container.position;
     const offset = centerWorld.subtract(containerWorld);
 
     if (offset.lengthSquared() < 1e-6) return; // Already centered
@@ -822,9 +827,10 @@ export class AssetManager {
     this.currentPlayerPosition = playerPosition;
 
     for (const [instance, lodData] of this.lodInstances) {
-      const worldPos = (typeof instance.getAbsolutePosition === 'function')
-        ? instance.getAbsolutePosition()
-        : instance.position;
+      const worldPos =
+        typeof instance.getAbsolutePosition === 'function'
+          ? instance.getAbsolutePosition()
+          : instance.position;
       const distance = BABYLON.Vector3.Distance(playerPosition, worldPos);
 
       let newLodLevel;
@@ -905,7 +911,7 @@ export class AssetManager {
       totalInstances: this.lodInstances.size,
       visible: 0,
       hidden: 0,
-      lodLevels: { high: 0, medium: 0, low: 0 }
+      lodLevels: { high: 0, medium: 0, low: 0 },
     };
 
     for (const [instance, lodData] of this.lodInstances) {
@@ -981,8 +987,8 @@ export class AssetManager {
    * Optimize texture memory usage
    */
   optimizeTextures() {
-    Object.values(this.textures).forEach(textureCategory => {
-      Object.values(textureCategory).forEach(texture => {
+    Object.values(this.textures).forEach((textureCategory) => {
+      Object.values(textureCategory).forEach((texture) => {
         if (texture instanceof BABYLON.Texture) {
           // Enable texture streaming for large textures
           if (texture.getSize().width > 512) {
@@ -997,8 +1003,8 @@ export class AssetManager {
    * Generate mipmaps for better performance
    */
   generateMipmaps() {
-    Object.values(this.textures).forEach(textureCategory => {
-      Object.values(textureCategory).forEach(texture => {
+    Object.values(this.textures).forEach((textureCategory) => {
+      Object.values(textureCategory).forEach((texture) => {
         if (texture instanceof BABYLON.Texture && !texture.noMipmap) {
           texture.updateSamplingMode(BABYLON.Texture.TRILINEAR_SAMPLINGMODE);
         }
@@ -1076,7 +1082,7 @@ export class AssetManager {
         },
         (event) => {
           // Progress callback
-          const percentage = event.loaded / event.total * 100;
+          const percentage = (event.loaded / event.total) * 100;
           this.loadingProgress = percentage;
         },
         (scene, message, exception) => {
@@ -1091,10 +1097,8 @@ export class AssetManager {
    * Preload assets from URLs
    */
   async preloadAssets(assetList) {
-    const loadPromises = assetList.map(asset => 
-      this.loadGLBModel(asset.url, asset.name)
-    );
-    
+    const loadPromises = assetList.map((asset) => this.loadGLBModel(asset.url, asset.name));
+
     try {
       await Promise.all(loadPromises);
       console.log('All external assets loaded');

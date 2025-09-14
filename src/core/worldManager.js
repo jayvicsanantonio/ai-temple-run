@@ -12,7 +12,7 @@ export class WorldManager {
     this.obstacleManager = obstacleManager;
     this.coinManager = coinManager;
     this.assetManager = assetManager;
-    
+
     // Tile management
     this.tiles = [];
     this.tilePool = [];
@@ -21,7 +21,7 @@ export class WorldManager {
     this.tilesAhead = 5; // Number of tiles to keep ahead of player
     this.tilesBehind = 2; // Number of tiles to keep behind player
     this.lastTileZ = 0;
-    
+
     // Visual variety - using temple pathway models
     this.tileTypes = ['pathwaySegment', 'curvedPath', 'intersection'];
     this.currentTileType = 'pathwaySegment';
@@ -33,13 +33,13 @@ export class WorldManager {
       // Align to loaded GLB name
       intersection: 'pathIntersection',
     };
-    
+
     // Difficulty parameters
     this.difficulty = 1.0;
     this.obstacleSpawnChance = 0.3;
     this.coinSpawnChance = 0.5;
     this.maxObstaclesPerTile = 2;
-    
+
     // Materials
     this.tileMaterials = [];
     this.decorationMeshes = [];
@@ -60,17 +60,20 @@ export class WorldManager {
   createTileMaterials() {
     // Main path material
     const pathMaterial = new BABYLON.StandardMaterial('pathMat', this.scene);
-    pathMaterial.diffuseTexture = new BABYLON.Texture('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', this.scene);
+    pathMaterial.diffuseTexture = new BABYLON.Texture(
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+      this.scene
+    );
     pathMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.25, 0.2);
     pathMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
     this.tileMaterials.push(pathMaterial);
-    
+
     // Alternative path material
     const altPathMaterial = new BABYLON.StandardMaterial('altPathMat', this.scene);
     altPathMaterial.diffuseColor = new BABYLON.Color3(0.35, 0.3, 0.25);
     altPathMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
     this.tileMaterials.push(altPathMaterial);
-    
+
     // Grass/side material
     const grassMaterial = new BABYLON.StandardMaterial('grassMat', this.scene);
     grassMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.4, 0.15);
@@ -83,7 +86,7 @@ export class WorldManager {
    */
   createTilePool() {
     const poolSize = 10;
-    
+
     for (let i = 0; i < poolSize; i++) {
       const tile = this.createTile(`tile_pool_${i}`);
       tile.setEnabled(false);
@@ -120,11 +123,12 @@ export class WorldManager {
 
     if (pathwayModel) {
       // Use the GLB temple pathway model with LOD
-      let path = this.assetManager.createLODInstance(
-        modelName,
-        `${name}_path`,
-        new BABYLON.Vector3(0, 0, 0)
-      ) || pathwayModel.createInstance(`${name}_path`);
+      let path =
+        this.assetManager.createLODInstance(
+          modelName,
+          `${name}_path`,
+          new BABYLON.Vector3(0, 0, 0)
+        ) || pathwayModel.createInstance(`${name}_path`);
 
       path.scaling = new BABYLON.Vector3(1, 1, 1);
       path.position.y = 0;
@@ -171,7 +175,7 @@ export class WorldManager {
       obstacles: [],
       coins: [],
       decorations: [],
-      tileType: tileType
+      tileType: tileType,
     };
 
     return tileContainer;
@@ -191,6 +195,43 @@ export class WorldManager {
       this.spawnTile(i * this.tileLength);
     }
     this.currentTileType = firstType;
+
+    // Add temple entrance gate at the beginning
+    this.addTempleEntrance();
+  }
+
+  /**
+   * Add temple entrance gate at the start of the game
+   */
+  addTempleEntrance() {
+    const entranceModel = this.assetManager?.getModel('entranceGate');
+    if (entranceModel) {
+      const entrance =
+        this.assetManager.createLODInstance(
+          'entranceGate',
+          'temple_entrance',
+          new BABYLON.Vector3(0, 0, -10)
+        ) || entranceModel.createInstance('temple_entrance');
+
+      entrance.position.x = 0;
+      entrance.position.y = 0;
+      entrance.position.z = -10;
+      entrance.scaling = new BABYLON.Vector3(1.2, 1.2, 1.2);
+
+      // Apply stone material
+      const stoneMaterial = this.assetManager?.getMaterial('castle_wall_slates');
+      if (stoneMaterial) {
+        const applyToMeshOrSource = (m) => {
+          const target = m && m.sourceMesh ? m.sourceMesh : m;
+          if (target && target.material !== undefined) target.material = stoneMaterial;
+        };
+        if (typeof entrance.getChildMeshes === 'function') {
+          for (const m of entrance.getChildMeshes(false)) applyToMeshOrSource(m);
+        } else {
+          applyToMeshOrSource(entrance);
+        }
+      }
+    }
   }
 
   /**
@@ -198,17 +239,18 @@ export class WorldManager {
    */
   spawnTile(zPosition) {
     const tile = this.getFromPool();
-    
+
     if (tile) {
       tile.position.z = zPosition;
       tile.setEnabled(true);
       tile.tileData.active = true;
-      
+
       // Add obstacles and coins based on difficulty
-      if (zPosition > 40) { // Don't spawn obstacles in the first few tiles
+      if (zPosition > 40) {
+        // Don't spawn obstacles in the first few tiles
         this.populateTile(tile, zPosition);
       }
-      
+
       this.tiles.push(tile);
       this.lastTileZ = zPosition;
     }
@@ -221,19 +263,19 @@ export class WorldManager {
     // Spawn obstacles
     if (Math.random() < this.obstacleSpawnChance * this.difficulty) {
       const numObstacles = Math.floor(Math.random() * this.maxObstaclesPerTile) + 1;
-      
+
       for (let i = 0; i < numObstacles; i++) {
-        const obstacleZ = zPosition + (Math.random() * (this.tileLength - 4)) + 2;
+        const obstacleZ = zPosition + Math.random() * (this.tileLength - 4) + 2;
         this.obstacleManager.spawnObstacle(obstacleZ);
       }
     }
-    
+
     // Spawn coins
     if (Math.random() < this.coinSpawnChance) {
-      const coinZ = zPosition + (Math.random() * (this.tileLength - 10)) + 5;
+      const coinZ = zPosition + Math.random() * (this.tileLength - 10) + 5;
       this.coinManager.spawnCoinGroup(coinZ);
     }
-    
+
     // Add random decorations
     this.addDecorations(tile, zPosition);
   }
@@ -252,8 +294,16 @@ export class WorldManager {
   addDecorations(tile, zPosition) {
     // Random chance to add temple decorations
     if (Math.random() < 0.4) {
-      const decorationModels = ['tree', 'mossStone', 'carvedSymbol'];
-      const randomDecoration = decorationModels[Math.floor(Math.random() * decorationModels.length)];
+      const decorationModels = [
+        'tree',
+        'mossStone',
+        'carvedSymbol',
+        'crystalFormation',
+        'fountain',
+        'vines',
+      ];
+      const randomDecoration =
+        decorationModels[Math.floor(Math.random() * decorationModels.length)];
       const decorationModel = this.assetManager?.getModel(randomDecoration);
 
       if (decorationModel) {
@@ -262,16 +312,26 @@ export class WorldManager {
         const decorationZ = zPosition + (Math.random() * 10 - 5);
         const decorationPos = new BABYLON.Vector3(decorationX, 0, decorationZ);
 
-        const decoration = this.assetManager.createLODInstance(
-          randomDecoration,
-          `decoration_${zPosition}_${randomDecoration}`,
-          decorationPos
-        ) || decorationModel.createInstance(`decoration_${zPosition}_${randomDecoration}`);
+        const decoration =
+          this.assetManager.createLODInstance(
+            randomDecoration,
+            `decoration_${zPosition}_${randomDecoration}`,
+            decorationPos
+          ) || decorationModel.createInstance(`decoration_${zPosition}_${randomDecoration}`);
 
         decoration.position.x = decorationX;
         decoration.position.y = 0;
         decoration.position.z = decorationZ;
-        decoration.scaling = new BABYLON.Vector3(0.6, 0.6, 0.6);
+
+        // Scale based on decoration type
+        let scale = 0.6;
+        if (randomDecoration === 'fountain' || randomDecoration === 'crystalFormation') {
+          scale = 0.8;
+        } else if (randomDecoration === 'vines') {
+          scale = 0.4;
+        }
+        decoration.scaling = new BABYLON.Vector3(scale, scale, scale);
+
         tile.tileData.decorations.push(decoration);
       }
     }
@@ -289,21 +349,21 @@ export class WorldManager {
     if (this.assetManager) {
       this.assetManager.updateLOD(playerPosition);
     }
-    
+
     // Spawn new tiles ahead
-    while (this.lastTileZ < playerZ + (this.tilesAhead * this.tileLength)) {
+    while (this.lastTileZ < playerZ + this.tilesAhead * this.tileLength) {
       this.spawnTile(this.lastTileZ + this.tileLength);
     }
-    
+
     // Remove tiles behind player
     for (let i = this.tiles.length - 1; i >= 0; i--) {
       const tile = this.tiles[i];
-      if (tile.position.z < playerZ - (this.tilesBehind * this.tileLength)) {
+      if (tile.position.z < playerZ - this.tilesBehind * this.tileLength) {
         this.returnToPool(tile);
         this.tiles.splice(i, 1);
       }
     }
-    
+
     // Update difficulty over time
     this.updateDifficulty(deltaTime);
   }
@@ -317,7 +377,7 @@ export class WorldManager {
         return tile;
       }
     }
-    
+
     // Create new tile if pool is exhausted
     const newTile = this.createTile(`tile_dynamic_${this.tilePool.length}`);
     this.tilePool.push(newTile);
@@ -330,7 +390,7 @@ export class WorldManager {
   returnToPool(tile) {
     tile.setEnabled(false);
     tile.tileData.active = false;
-    
+
     // Clean up decorations and remove from LOD tracking
     for (const decoration of tile.tileData.decorations) {
       if (this.assetManager) {
@@ -348,7 +408,7 @@ export class WorldManager {
     // Gradually increase difficulty
     this.difficulty += deltaTime * 0.01;
     this.difficulty = Math.min(this.difficulty, 3.0);
-    
+
     // Increase spawn chances with difficulty
     this.obstacleSpawnChance = Math.min(0.3 + (this.difficulty - 1) * 0.2, 0.7);
     this.maxObstaclesPerTile = Math.min(2 + Math.floor(this.difficulty - 1), 4);
@@ -362,14 +422,14 @@ export class WorldManager {
     for (const tile of this.tiles) {
       this.returnToPool(tile);
     }
-    
+
     this.tiles = [];
     this.lastTileZ = 0;
     this.difficulty = 1.0;
     this.obstacleSpawnChance = 0.3;
     this.coinSpawnChance = 0.5;
     this.maxObstaclesPerTile = 2;
-    
+
     // Spawn initial tiles again
     this.spawnInitialTiles();
   }

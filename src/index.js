@@ -35,7 +35,7 @@ class TempleRunGame {
     this.performanceMonitor = null;
     this.performanceTest = null;
     this.debugMode = false;
-    
+
     // Game state
     this.isPlaying = false;
     this.isPaused = false;
@@ -54,23 +54,23 @@ class TempleRunGame {
    */
   async init() {
     console.log('Initializing Temple Run Web Game...');
-    
+
     // Setup canvas
     this.setupCanvas();
-    
+
     // Initialize scene
     this.mainScene = new MainScene(this.canvas);
     this.scene = await this.mainScene.init();
-    
+
     // Initialize game systems
     await this.initializeSystems();
-    
+
     // Setup input
     this.setupInput();
-    
+
     // Setup UI callbacks
     this.setupUICallbacks();
-    
+
     // Initialize UI
     this.uiManager.init();
 
@@ -108,52 +108,57 @@ class TempleRunGame {
     await this.assetManager.init();
     // Enable and configure LOD distances aligned with gameplay scale
     this.assetManager.configureLOD(true, { high: 30, medium: 70, low: 120 });
-    
+
     // Initialize game loop
     this.gameLoop = new GameLoop(this.scene);
-    
+
     // Initialize player controller with improved model
     this.playerController = new PlayerController(this.scene);
     const playerMesh = this.assetManager.getAsset('player') || this.createPlayerPlaceholder();
     this.playerController.init(playerMesh);
-    
+
     // Check for debug mode and initialize collider debug state
     this.debugMode = window.location.search.includes('debug=true');
     this._debugColliders = this.debugMode;
     if (this._debugColliders) {
       this.playerController.setDebugCollider(true);
     }
-    
+
     // Initialize obstacle manager
     this.obstacleManager = new ObstacleManager(this.scene, this.assetManager);
     this.obstacleManager.init();
     if (this._debugColliders) {
       this.obstacleManager.setDebugColliders(true);
     }
-    
+
     // Initialize coin manager
-    this.coinManager = new CoinManager(this.scene);
+    this.coinManager = new CoinManager(this.scene, this.assetManager);
     this.coinManager.init();
-    
+
     // Initialize world manager with obstacle and coin managers
-    this.worldManager = new WorldManager(this.scene, this.obstacleManager, this.coinManager, this.assetManager);
+    this.worldManager = new WorldManager(
+      this.scene,
+      this.obstacleManager,
+      this.coinManager,
+      this.assetManager
+    );
     this.worldManager.init();
-    
+
     // Initialize UI manager
     this.uiManager = new UIManager();
-    
+
     // Initialize input handler
     this.inputHandler = new InputHandler();
     this.inputHandler.init();
 
     // Initialize performance test utility
     this.performanceTest = new PerformanceTest(this);
-    
+
     // Register systems with game loop
     this.gameLoop.registerSystem(this.playerController);
     this.gameLoop.registerSystem(this.worldManager);
     this.gameLoop.registerSystem({
-      update: (deltaTime) => this.updateGame(deltaTime)
+      update: (deltaTime) => this.updateGame(deltaTime),
     });
   }
 
@@ -161,24 +166,20 @@ class TempleRunGame {
    * Create a placeholder player mesh
    */
   createPlayerPlaceholder() {
-    const player = BABYLON.MeshBuilder.CreateBox(
-      'player',
-      { size: 1 },
-      this.scene
-    );
-    
+    const player = BABYLON.MeshBuilder.CreateBox('player', { size: 1 }, this.scene);
+
     player.position.y = 0.5;
-    
+
     // Create player material
     const playerMaterial = new BABYLON.StandardMaterial('playerMat', this.scene);
     playerMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.6, 1);
     player.material = playerMaterial;
-    
+
     // Enable shadows
     if (this.mainScene.shadowGenerator) {
       this.mainScene.shadowGenerator.addShadowCaster(player);
     }
-    
+
     return player;
   }
 
@@ -217,16 +218,16 @@ class TempleRunGame {
     this.score = 0;
     this.distanceTraveled = 0;
     this.gameSpeed = 1.0;
-    
+
     // Reset all systems
     this.playerController.reset();
     this.obstacleManager.reset();
     this.coinManager.reset();
     this.worldManager.reset();
-    
+
     // Enable input
     this.inputHandler.enable();
-    
+
     // Start game loop
     this.gameLoop.start();
   }
@@ -244,9 +245,9 @@ class TempleRunGame {
    */
   togglePause() {
     if (!this.isPlaying) return;
-    
+
     this.isPaused = !this.isPaused;
-    
+
     if (this.isPaused) {
       this.gameLoop.pause();
       console.log('Game paused');
@@ -261,44 +262,48 @@ class TempleRunGame {
    */
   updateGame(deltaTime) {
     if (!this.isPlaying || this.isPaused) return;
-    
+
     // Update distance traveled
     this.distanceTraveled += this.playerController.forwardSpeed * deltaTime;
-    
+
     // Update score based on distance and coins
-    this.score = Math.floor(this.distanceTraveled) + (this.coinManager.getCollectedCoins() * 10);
-    
+    this.score = Math.floor(this.distanceTraveled) + this.coinManager.getCollectedCoins() * 10;
+
     // Update UI
     this.uiManager.updateScore(this.score);
     this.uiManager.updateDistance(this.distanceTraveled);
     this.uiManager.updateCoins(this.coinManager.getCollectedCoins());
-    
+
     // Check for coin collection (uses player position)
     const coinsCollected = this.coinManager.checkCollection(this.playerController.player);
     if (coinsCollected > 0) {
       console.log(`Collected ${coinsCollected} coins!`);
     }
-    
+
     // Check for collisions with obstacles using the collider mesh
     // Add a small grace distance to avoid instant game over on spawn
-    if (this.distanceTraveled > 5 && this.obstacleManager.checkCollision(this.playerController.collider)) {
+    if (
+      this.distanceTraveled > 5 &&
+      this.obstacleManager.checkCollision(this.playerController.collider)
+    ) {
       this.gameOver();
     }
-    
+
     // Update camera to follow player
     if (this.playerController.player) {
       this.mainScene.updateCameraFollow(this.playerController.player.position);
     }
-    
+
     // Gradually increase game speed
     this.increaseGameSpeed(deltaTime);
-    
+
     // World manager handles obstacle and coin spawning now
     const playerPos = this.playerController.player ? this.playerController.player.position : null;
     this.worldManager.update(deltaTime, playerPos);
 
     // Log LOD statistics periodically
-    if (this.frameCount % 300 === 0 && this.assetManager) { // Every 5 seconds at 60fps
+    if (this.frameCount % 300 === 0 && this.assetManager) {
+      // Every 5 seconds at 60fps
       const lodStats = this.assetManager.getLODStats();
       this.performanceMonitor.logLODStats(lodStats);
     }
@@ -310,7 +315,7 @@ class TempleRunGame {
 
     this.frameCount = this.frameCount || 0;
     this.frameCount++;
-    
+
     // Still need to update obstacle and coin animations/cleanup
     this.obstacleManager.updateObstacles(playerPos);
     this.coinManager.updateCoins(deltaTime, playerPos);
@@ -323,7 +328,7 @@ class TempleRunGame {
     if (this.gameSpeed < this.maxSpeed) {
       this.gameSpeed += this.speedIncreaseRate * deltaTime;
       this.gameLoop.setGameSpeed(this.gameSpeed);
-      
+
       // Also increase player forward speed
       const newSpeed = 10 + (this.gameSpeed - 1) * 5;
       this.playerController.setForwardSpeed(newSpeed);
@@ -344,14 +349,14 @@ class TempleRunGame {
     console.log('Performance Report:', performanceReport);
 
     this.isPlaying = false;
-    
+
     // Stop game systems
     this.gameLoop.stop();
     this.inputHandler.disable();
-    
+
     // Show game over UI
     this.uiManager.gameOver();
-    
+
     // Play death animation
     this.playerController.die();
   }
@@ -412,10 +417,12 @@ class TempleRunGame {
         <h3>Performance Report</h3>
         <p><strong>Status:</strong> ${summary.overallStatus}</p>
         <p><strong>Tests:</strong> ${summary.passed}✓ ${summary.warnings}⚠ ${summary.failed}✗</p>
-        ${report.recommendations.length > 0 ?
-          '<h4>Recommendations:</h4>' +
-          report.recommendations.map(r => `<p>• ${r.suggestion}</p>`).join('')
-          : ''}
+        ${
+          report.recommendations.length > 0
+            ? '<h4>Recommendations:</h4>' +
+              report.recommendations.map((r) => `<p>• ${r.suggestion}</p>`).join('')
+            : ''
+        }
       `;
 
       document.body.appendChild(overlay);

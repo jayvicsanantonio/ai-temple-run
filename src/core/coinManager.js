@@ -6,21 +6,22 @@
 import * as BABYLON from 'babylonjs';
 
 export class CoinManager {
-  constructor(scene) {
+  constructor(scene, assetManager) {
     this.scene = scene;
+    this.assetManager = assetManager;
     this.coins = [];
     this.coinPool = [];
     this.collectedCoins = 0;
     this.totalCoins = 0;
-    
+
     // Spawn parameters
     this.spawnDistance = 50;
     this.lastSpawnZ = 0;
     this.coinsPerGroup = 5;
-    
+
     // Lane positions matching player controller
     this.lanes = [-2, 0, 2];
-    
+
     // Visual properties
     this.coinRotationSpeed = 2;
   }
@@ -37,32 +38,58 @@ export class CoinManager {
    */
   createCoinPool() {
     const poolSize = 50;
-    
+
     for (let i = 0; i < poolSize; i++) {
-      // Create coin mesh (cylinder for now, will be replaced with actual coin model)
-      const coin = BABYLON.MeshBuilder.CreateCylinder(
-        `coin_${i}`,
-        { height: 0.1, diameter: 0.8 },
-        this.scene
-      );
-      
-      // Create golden material
-      const material = new BABYLON.StandardMaterial(`coin_mat_${i}`, this.scene);
-      material.diffuseColor = new BABYLON.Color3(1, 0.84, 0);
-      material.specularColor = new BABYLON.Color3(1, 1, 1);
-      material.emissiveColor = new BABYLON.Color3(0.2, 0.15, 0);
-      coin.material = material;
-      
-      coin.isVisible = false;
-      coin.rotation.x = Math.PI / 2; // Rotate to face forward
-      
+      // Try to use temple coin GLB model, fallback to procedural
+      const coinModel = this.assetManager?.getModel('coin');
+      let coin;
+
+      if (coinModel) {
+        // Use temple coin GLB model with LOD
+        coin =
+          this.assetManager.createLODInstance('coin', `coin_${i}`, new BABYLON.Vector3(0, 0, 0)) ||
+          coinModel.createInstance(`coin_${i}`);
+
+        // Apply golden material to temple coin
+        const goldMaterial = this.assetManager?.getMaterial('metal_plate');
+        if (goldMaterial) {
+          const applyToMeshOrSource = (m) => {
+            const target = m && m.sourceMesh ? m.sourceMesh : m;
+            if (target && target.material !== undefined) target.material = goldMaterial;
+          };
+          if (typeof coin.getChildMeshes === 'function') {
+            for (const m of coin.getChildMeshes(false)) applyToMeshOrSource(m);
+          } else {
+            applyToMeshOrSource(coin);
+          }
+        }
+      } else {
+        // Fallback to procedural coin
+        coin = BABYLON.MeshBuilder.CreateCylinder(
+          `coin_${i}`,
+          { height: 0.1, diameter: 0.8 },
+          this.scene
+        );
+
+        // Create golden material
+        const material = new BABYLON.StandardMaterial(`coin_mat_${i}`, this.scene);
+        material.diffuseColor = new BABYLON.Color3(1, 0.84, 0);
+        material.specularColor = new BABYLON.Color3(1, 1, 1);
+        material.emissiveColor = new BABYLON.Color3(0.2, 0.15, 0);
+        coin.material = material;
+
+        coin.rotation.x = Math.PI / 2; // Rotate to face forward
+      }
+
+      coin.setEnabled(false);
+
       // Store coin data
       coin.coinData = {
         active: false,
         collected: false,
-        lane: null
+        lane: null,
       };
-      
+
       this.coinPool.push(coin);
     }
   }
@@ -90,27 +117,27 @@ export class CoinManager {
     // Random lane selection
     const lane = Math.floor(Math.random() * this.lanes.length);
     const xPos = this.lanes[lane];
-    
+
     // Spawn coins in a line
     for (let i = 0; i < this.coinsPerGroup; i++) {
       const coin = this.getFromPool();
-      
+
       if (coin) {
         coin.position.x = xPos;
         coin.position.y = 1; // Float above ground
-        coin.position.z = startZ + (i * 2); // Space coins apart
-        
+        coin.position.z = startZ + i * 2; // Space coins apart
+
         coin.coinData.active = true;
         coin.coinData.collected = false;
         coin.coinData.lane = lane;
-        
-        coin.isVisible = true;
+
+        coin.setEnabled(true);
         this.coins.push(coin);
         this.totalCoins++;
       }
     }
-    
-    this.lastSpawnZ = startZ + (this.coinsPerGroup * 2);
+
+    this.lastSpawnZ = startZ + this.coinsPerGroup * 2;
   }
 
   /**
@@ -124,19 +151,19 @@ export class CoinManager {
     for (let i = this.coins.length - 1; i >= 0; i--) {
       const coin = this.coins[i];
       const dz = coin.position.z - playerPosition.z;
-      
+
       // Distance-based culling to reduce draw calls
       if (dz > 80) {
-        coin.isVisible = false;
+        coin.setEnabled(false);
       } else if (dz > -10) {
-        coin.isVisible = true;
+        coin.setEnabled(true);
       }
-      
+
       // Rotate coin
-      if (coin.isVisible) {
-        coin.rotation.z += this.coinRotationSpeed * deltaTime;
+      if (coin.isEnabled()) {
+        coin.rotation.y += this.coinRotationSpeed * deltaTime;
       }
-      
+
       // Check if coin is far behind the player
       if (coin.position.z < playerPosition.z - 10) {
         this.returnToPool(coin);
@@ -152,25 +179,25 @@ export class CoinManager {
    */
   checkCollection(playerMesh) {
     if (!playerMesh) return 0;
-    
+
     let coinsCollectedThisFrame = 0;
 
     for (let i = this.coins.length - 1; i >= 0; i--) {
       const coin = this.coins[i];
-      
+
       if (coin.coinData.active && !coin.coinData.collected) {
         // Check distance for collection (more forgiving than mesh intersection)
         const distance = BABYLON.Vector3.Distance(coin.position, playerMesh.position);
-        
+
         if (distance < 1.5) {
           // Collect the coin
           coin.coinData.collected = true;
           this.collectedCoins++;
           coinsCollectedThisFrame++;
-          
+
           // Play collection animation
           this.playCollectionAnimation(coin);
-          
+
           // Remove from active list after a short delay
           setTimeout(() => {
             const index = this.coins.indexOf(coin);
@@ -182,7 +209,7 @@ export class CoinManager {
         }
       }
     }
-    
+
     return coinsCollectedThisFrame;
   }
 
@@ -199,16 +226,16 @@ export class CoinManager {
       BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
       BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
     );
-    
+
     const keys = [
       { frame: 0, value: coin.scaling.clone() },
       { frame: 10, value: new BABYLON.Vector3(1.5, 1.5, 1.5) },
-      { frame: 20, value: new BABYLON.Vector3(0, 0, 0) }
+      { frame: 20, value: new BABYLON.Vector3(0, 0, 0) },
     ];
-    
+
     animationScale.setKeys(keys);
     coin.animations.push(animationScale);
-    
+
     this.scene.beginAnimation(coin, 0, 20, false);
   }
 
@@ -230,11 +257,16 @@ export class CoinManager {
    * @param {BABYLON.Mesh} coin - The coin to return
    */
   returnToPool(coin) {
-    coin.isVisible = false;
+    coin.setEnabled(false);
     coin.coinData.active = false;
     coin.coinData.collected = false;
     coin.coinData.lane = null;
     coin.scaling = new BABYLON.Vector3(1, 1, 1);
+
+    // Remove from LOD tracking
+    if (this.assetManager) {
+      this.assetManager.removeLODInstance(coin);
+    }
   }
 
   /**
@@ -245,7 +277,7 @@ export class CoinManager {
     for (const coin of this.coins) {
       this.returnToPool(coin);
     }
-    
+
     this.coins = [];
     this.collectedCoins = 0;
     this.totalCoins = 0;
