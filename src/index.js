@@ -20,6 +20,7 @@ import { BlenderExportIntegration } from './core/blenderExportIntegration.js';
 import { PhysicsEngineManager } from './core/physicsEngineManager.js';
 import { AssetOptimizer } from './core/assetOptimizer.js';
 import { PerformanceMonitor } from './core/performanceMonitor.js';
+import { BlenderAssetManager } from './core/blenderAssetManager.js';
 import { InputHandler } from './utils/inputHandler.js';
 
 // Import styles
@@ -46,6 +47,7 @@ class TempleRunGame {
     this.physics = null;
     this.assetOptimizer = null;
     this.performanceMonitor = null;
+    this.blenderAssets = null;
 
     // Game state
     this.isPlaying = false;
@@ -212,6 +214,17 @@ class TempleRunGame {
     this.gameLoop.registerSystem({
       update: () => this.performanceMonitor.update(),
     });
+
+    // Unified Blender asset manager (Hyper3D + PolyHaven + AssetManager)
+    this.blenderAssets = new BlenderAssetManager(
+      this.scene,
+      this.assetManager,
+      {
+        hyper3d: this.hyper3d,
+        polyHaven: this.polyHaven,
+      },
+      this.config
+    );
   }
 
   /**

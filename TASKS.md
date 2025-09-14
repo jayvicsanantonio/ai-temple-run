@@ -98,17 +98,17 @@
     - Implemented in: `src/core/performanceMonitor.js`; wired into game loop
     - _Requirements: 6.1, 6.3, 6.4_
 
-- [ ] 8. Create comprehensive asset management system
-  - [ ] 8.1 Implement BlenderAssetManager integration
-    - Combine Hyper3D and PolyHaven integrations into unified manager
-    - Add asset caching and metadata tracking system
-    - Implement asset validation and integrity checking
+- [x] 8. Create comprehensive asset management system
+  - [x] 8.1 Implement BlenderAssetManager integration
+    - Unified manager combining Hyper3D + PolyHaven + AssetManager
+    - Asset caching with ref-counts, metadata registry, validation helpers
+    - Implemented in: `src/core/blenderAssetManager.js`
     - _Requirements: 1.1, 1.2, 2.1, 2.2_
 
-  - [ ] 8.2 Create asset loading and streaming system
-    - Implement Three.js GLTFLoader integration for runtime loading
-    - Add progressive asset loading with priority system
-    - Create asset unloading system for memory management
+  - [x] 8.2 Create asset loading and streaming system
+    - Progressive, prioritized GLB loading queue (Babylon SceneLoader wrapper)
+    - Unload/release via ref-count disposal for memory management
+    - Note: Three.js GLTFLoader replaced with Babylon loader in this project
     - _Requirements: 2.2, 6.3, 6.5_
 
 - [ ] 9. Implement error handling and fallback systems
