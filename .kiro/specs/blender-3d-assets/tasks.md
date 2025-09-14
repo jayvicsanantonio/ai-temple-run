@@ -6,7 +6,7 @@
   - Use text prompts: "ancient stone pathway segment", "curved temple path", "temple intersection"
   - Export as GLB to `/public/assets/models/pathways/`
 
-- [ ] 2. Generate temple architecture using Hyper3D
+- [x] 2. Generate temple architecture using Hyper3D
   - Use text prompts: "ornate stone pillar", "temple wall segment", "stone bridge platform"
   - Export as GLB to `/public/assets/models/architecture/`
 
