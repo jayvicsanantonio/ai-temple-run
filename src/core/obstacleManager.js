@@ -121,8 +121,13 @@ export class ObstacleManager {
     const obstacleModel = this.assetManager?.getModel(modelName);
 
     if (obstacleModel) {
-      // Use temple obstacle GLB model
-      const mesh = obstacleModel.createInstance(`${obstacle.name}_${type}`);
+      // Use temple obstacle GLB model with LOD
+      const mesh = this.assetManager.createLODInstance(
+        modelName,
+        `${obstacle.name}_${type}`,
+        obstacle.position.clone()
+      ) || obstacleModel.createInstance(`${obstacle.name}_${type}`);
+
       mesh.parent = obstacle;
       mesh.checkCollisions = true;
       obstacle.obstacleData.mesh = mesh;
@@ -190,6 +195,9 @@ export class ObstacleManager {
   updateObstacles(playerPosition) {
     if (!playerPosition) return;
 
+    // Update LOD for obstacles (handled by AssetManager but we can add specific logic here)
+    // The AssetManager.updateLOD() is called from WorldManager
+
     for (let i = this.obstacles.length - 1; i >= 0; i--) {
       const obstacle = this.obstacles[i];
       const dz = obstacle.position.z - playerPosition.z;
@@ -234,8 +242,11 @@ export class ObstacleManager {
     obstacle.obstacleData.type = null;
     obstacle.obstacleData.lane = null;
 
-    // Dispose of the mesh instance to free resources
+    // Dispose of the mesh instance and remove from LOD tracking
     if (obstacle.obstacleData.mesh) {
+      if (this.assetManager) {
+        this.assetManager.removeLODInstance(obstacle.obstacleData.mesh);
+      }
       obstacle.obstacleData.mesh.dispose();
       obstacle.obstacleData.mesh = null;
     }

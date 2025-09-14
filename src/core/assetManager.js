@@ -7,7 +7,7 @@ import * as BABYLON from 'babylonjs';
 import 'babylonjs-loaders';
 
 export class AssetManager {
-  constructor(scene) {
+  constructor(scene, performanceMonitor = null) {
     this.scene = scene;
     this.assets = {};
     this.textures = {};
@@ -15,6 +15,7 @@ export class AssetManager {
     this.loadingProgress = 0;
     this.isLoading = false;
     this.assetBasePath = '/assets/';
+    this.performanceMonitor = performanceMonitor;
     this.modelPaths = {
       pathways: 'models/pathways/',
       architecture: 'models/architecture/',
@@ -47,7 +48,10 @@ export class AssetManager {
       // Setup materials with loaded textures
       this.createMaterials();
 
-      console.log('All assets loaded successfully');
+      // Optimize assets after loading
+      this.optimizeAssets();
+
+      console.log('All assets loaded and optimized successfully');
     } catch (error) {
       console.error('Error loading assets:', error);
     } finally {
@@ -84,8 +88,16 @@ export class AssetManager {
 
     const loadPromises = modelAssets.map(async (asset) => {
       const url = this.assetBasePath + 'models/' + asset.path;
+      const startTime = performance.now();
+
       try {
         await this.loadGLBModel(url, asset.name);
+
+        // Log loading performance
+        if (this.performanceMonitor) {
+          this.performanceMonitor.logAssetLoad(asset.name, startTime, performance.now());
+        }
+
         console.log(`Loaded GLB model: ${asset.name}`);
       } catch (error) {
         console.warn(`Failed to load GLB model ${asset.name}, will use procedural fallback`);

@@ -13,6 +13,8 @@ import { WorldManager } from './core/worldManager.js';
 import { AssetManager } from './core/assetManager.js';
 import { UIManager } from './core/uiManager.js';
 import { InputHandler } from './utils/inputHandler.js';
+import { PerformanceMonitor } from './utils/performanceMonitor.js';
+import { PerformanceTest } from './utils/performanceTest.js';
 
 // Import styles
 import '../style.css';
@@ -30,6 +32,9 @@ class TempleRunGame {
     this.assetManager = null;
     this.uiManager = null;
     this.inputHandler = null;
+    this.performanceMonitor = null;
+    this.performanceTest = null;
+    this.debugMode = false;
     
     // Game state
     this.isPlaying = false;
@@ -65,8 +70,14 @@ class TempleRunGame {
     
     // Initialize UI
     this.uiManager.init();
-    
+
     console.log('Game initialized successfully!');
+
+    // Run performance tests in debug mode
+    if (this.debugMode) {
+      console.log('Debug mode enabled - running performance tests...');
+      setTimeout(() => this.runPerformanceTests(), 2000);
+    }
   }
 
   /**
@@ -86,8 +97,11 @@ class TempleRunGame {
    * Initialize all game systems
    */
   async initializeSystems() {
+    // Initialize performance monitor first
+    this.performanceMonitor = new PerformanceMonitor();
+
     // Initialize asset manager first
-    this.assetManager = new AssetManager(this.scene);
+    this.assetManager = new AssetManager(this.scene, this.performanceMonitor);
     await this.assetManager.init();
     
     // Initialize game loop
@@ -116,6 +130,12 @@ class TempleRunGame {
     // Initialize input handler
     this.inputHandler = new InputHandler();
     this.inputHandler.init();
+
+    // Initialize performance test utility
+    this.performanceTest = new PerformanceTest(this);
+
+    // Check for debug mode
+    this.debugMode = window.location.search.includes('debug=true');
     
     // Register systems with game loop
     this.gameLoop.registerSystem(this.playerController);
@@ -175,7 +195,10 @@ class TempleRunGame {
    */
   startGame() {
     console.log('Starting game...');
-    
+
+    // Start performance monitoring
+    this.performanceMonitor.start();
+
     this.isPlaying = true;
     this.isPaused = false;
     this.score = 0;
@@ -259,6 +282,20 @@ class TempleRunGame {
     // World manager handles obstacle and coin spawning now
     const playerPos = this.playerController.player ? this.playerController.player.position : null;
     this.worldManager.update(deltaTime, playerPos);
+
+    // Log LOD statistics periodically
+    if (this.frameCount % 300 === 0 && this.assetManager) { // Every 5 seconds at 60fps
+      const lodStats = this.assetManager.getLODStats();
+      this.performanceMonitor.logLODStats(lodStats);
+    }
+
+    // Log performance snapshot every 10 seconds
+    if (this.frameCount % 600 === 0) {
+      this.performanceMonitor.logSnapshot();
+    }
+
+    this.frameCount = this.frameCount || 0;
+    this.frameCount++;
     
     // Still need to update obstacle and coin animations/cleanup
     this.obstacleManager.updateObstacles(playerPos);
@@ -287,7 +324,11 @@ class TempleRunGame {
     console.log(`Final Score: ${this.score}`);
     console.log(`Distance: ${Math.floor(this.distanceTraveled)}m`);
     console.log(`Coins: ${this.coinManager.getCollectedCoins()}`);
-    
+
+    // Get performance report
+    const performanceReport = this.performanceMonitor.stop();
+    console.log('Performance Report:', performanceReport);
+
     this.isPlaying = false;
     
     // Stop game systems
@@ -299,6 +340,65 @@ class TempleRunGame {
     
     // Play death animation
     this.playerController.die();
+  }
+
+  /**
+   * Run performance tests
+   */
+  async runPerformanceTests() {
+    try {
+      const report = await this.performanceTest.runAllTests();
+      console.log('Performance tests completed:', report);
+
+      // Display results in UI if needed
+      this.displayPerformanceResults(report);
+    } catch (error) {
+      console.error('Performance tests failed:', error);
+    }
+  }
+
+  /**
+   * Display performance results (could be shown in UI)
+   */
+  displayPerformanceResults(report) {
+    if (this.debugMode) {
+      // Create a simple debug overlay
+      const overlay = document.createElement('div');
+      overlay.id = 'performance-overlay';
+      overlay.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 10px;
+        font-family: monospace;
+        font-size: 12px;
+        max-width: 300px;
+        z-index: 1000;
+        border-radius: 5px;
+      `;
+
+      const summary = report.summary;
+      overlay.innerHTML = `
+        <h3>Performance Report</h3>
+        <p><strong>Status:</strong> ${summary.overallStatus}</p>
+        <p><strong>Tests:</strong> ${summary.passed}✓ ${summary.warnings}⚠ ${summary.failed}✗</p>
+        ${report.recommendations.length > 0 ?
+          '<h4>Recommendations:</h4>' +
+          report.recommendations.map(r => `<p>• ${r.suggestion}</p>`).join('')
+          : ''}
+      `;
+
+      document.body.appendChild(overlay);
+
+      // Remove overlay after 10 seconds
+      setTimeout(() => {
+        if (overlay.parentNode) {
+          overlay.parentNode.removeChild(overlay);
+        }
+      }, 10000);
+    }
   }
 }
 
