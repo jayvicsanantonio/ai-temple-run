@@ -28,7 +28,7 @@
   - Search for: "metal", "gold", "bronze" categories
   - Download 1k resolution to `/public/assets/textures/metal/`
 
-- [ ] 7. Download organic textures from PolyHaven
+- [x] 7. Download organic textures from PolyHaven
   - Search for: "wood", "moss", "dirt" categories
   - Download 1k resolution to `/public/assets/textures/organic/`
 
