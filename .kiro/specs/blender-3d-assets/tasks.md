@@ -10,7 +10,7 @@
   - Use text prompts: "ornate stone pillar", "temple wall segment", "stone bridge platform"
   - Export as GLB to `/public/assets/models/architecture/`
 
-- [ ] 3. Generate obstacle variations using Hyper3D
+- [x] 3. Generate obstacle variations using Hyper3D
   - Use text prompts: "fallen temple log", "weathered stone block", "ancient spike trap"
   - Export as GLB to `/public/assets/models/obstacles/`
 
