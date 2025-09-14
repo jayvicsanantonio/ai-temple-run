@@ -112,6 +112,15 @@ class TempleRunGame {
       this.config
     );
 
+    // Apply default PolyHaven textures to path/walls (best-effort)
+    if (this.worldManager && this.worldManager.applyDefaultPolyHavenTextures) {
+      try {
+        await this.worldManager.applyDefaultPolyHavenTextures(this.polyHaven);
+      } catch (e) {
+        console.warn('PolyHaven default textures failed:', e);
+      }
+    }
+
     console.log('Game initialized successfully!');
   }
 
