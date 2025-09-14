@@ -99,7 +99,7 @@ class TempleRunGame {
     this.playerController.init(playerMesh);
     
     // Initialize obstacle manager
-    this.obstacleManager = new ObstacleManager(this.scene);
+    this.obstacleManager = new ObstacleManager(this.scene, this.assetManager);
     this.obstacleManager.init();
     
     // Initialize coin manager
@@ -107,7 +107,7 @@ class TempleRunGame {
     this.coinManager.init();
     
     // Initialize world manager with obstacle and coin managers
-    this.worldManager = new WorldManager(this.scene, this.obstacleManager, this.coinManager);
+    this.worldManager = new WorldManager(this.scene, this.obstacleManager, this.coinManager, this.assetManager);
     this.worldManager.init();
     
     // Initialize UI manager

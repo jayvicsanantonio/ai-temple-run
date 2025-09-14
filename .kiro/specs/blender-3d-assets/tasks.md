@@ -39,7 +39,7 @@
   - Implement asset preloading from `/public/assets/models/`
   - Add texture loading from `/public/assets/textures/`
 
-- [ ] 9. Integrate new assets into game systems
+- [x] 9. Integrate new assets into game systems
   - Update worldManager.js to use new temple models
   - Update obstacleManager.js to use new obstacle models
   - Ensure proper collision detection with new geometry

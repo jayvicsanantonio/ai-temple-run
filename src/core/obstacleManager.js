@@ -4,20 +4,27 @@
  */
 
 import * as BABYLON from 'babylonjs';
+import { AssetManager } from './assetManager.js';
 
 export class ObstacleManager {
-  constructor(scene) {
+  constructor(scene, assetManager) {
     this.scene = scene;
+    this.assetManager = assetManager;
     this.obstacles = [];
     this.obstaclePool = [];
     this.spawnDistance = 50;
     this.lastSpawnZ = 0;
     this.minSpacing = 10;
     this.maxSpacing = 20;
-    
-    // Obstacle types
-    this.obstacleTypes = ['log', 'rock', 'pit', 'spike'];
-    
+
+    // Temple obstacle types mapped to GLB models
+    this.obstacleTypes = ['log', 'rock', 'spike'];
+    this.obstacleModelMap = {
+      'log': 'logObstacle',
+      'rock': 'stoneBlock',
+      'spike': 'spikeTrap'
+    };
+
     // Lane positions matching player controller
     this.lanes = [-2, 0, 2];
   }
@@ -30,29 +37,24 @@ export class ObstacleManager {
   }
 
   /**
-   * Create a pool of reusable obstacles
+   * Create a pool of reusable obstacle containers
    */
   createObstaclePool() {
     const poolSize = 20;
-    
+
     for (let i = 0; i < poolSize; i++) {
-      // Create placeholder obstacles (boxes for now)
-      const obstacle = BABYLON.MeshBuilder.CreateBox(
-        `obstacle_${i}`,
-        { size: 1 },
-        this.scene
-      );
-      
-      obstacle.isVisible = false;
-      obstacle.checkCollisions = true;
-      
+      // Create transform node containers for obstacles
+      const obstacle = new BABYLON.TransformNode(`obstacle_${i}`, this.scene);
+      obstacle.setEnabled(false);
+
       // Store obstacle data
       obstacle.obstacleData = {
         type: null,
         lane: null,
-        active: false
+        active: false,
+        mesh: null // Will hold the actual obstacle mesh instance
       };
-      
+
       this.obstaclePool.push(obstacle);
     }
   }
@@ -97,7 +99,7 @@ export class ObstacleManager {
       obstacle.obstacleData.active = true;
       
       // Make visible and add to active list
-      obstacle.isVisible = true;
+      obstacle.setEnabled(true);
       this.obstacles.push(obstacle);
       
       // Update last spawn position
@@ -109,35 +111,76 @@ export class ObstacleManager {
   }
 
   /**
-   * Configure obstacle appearance based on type
-   * @param {BABYLON.Mesh} obstacle - The obstacle mesh
+   * Configure obstacle appearance using temple GLB models
+   * @param {BABYLON.TransformNode} obstacle - The obstacle container
    * @param {string} type - The obstacle type
    */
   configureObstacleAppearance(obstacle, type) {
-    // Placeholder appearances - will be replaced with actual models
-    const material = new BABYLON.StandardMaterial(`${type}_mat`, this.scene);
-    
-    switch (type) {
-      case 'log':
-        obstacle.scaling = new BABYLON.Vector3(3, 0.5, 0.5);
-        material.diffuseColor = new BABYLON.Color3(0.4, 0.2, 0.1);
-        break;
-      case 'rock':
-        obstacle.scaling = new BABYLON.Vector3(1, 1.5, 1);
-        material.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.5);
-        break;
-      case 'pit':
-        obstacle.scaling = new BABYLON.Vector3(2, 0.1, 2);
-        obstacle.position.y = -0.45;
-        material.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.1);
-        break;
-      case 'spike':
-        obstacle.scaling = new BABYLON.Vector3(0.5, 2, 0.5);
-        material.diffuseColor = new BABYLON.Color3(0.7, 0.7, 0.7);
-        break;
+    // Get the corresponding temple obstacle model
+    const modelName = this.obstacleModelMap[type];
+    const obstacleModel = this.assetManager?.getModel(modelName);
+
+    if (obstacleModel) {
+      // Use temple obstacle GLB model
+      const mesh = obstacleModel.createInstance(`${obstacle.name}_${type}`);
+      mesh.parent = obstacle;
+      mesh.checkCollisions = true;
+      obstacle.obstacleData.mesh = mesh;
+
+      // Configure scaling and positioning based on type
+      switch (type) {
+        case 'log':
+          mesh.scaling = new BABYLON.Vector3(1.2, 1, 1.2);
+          mesh.position.y = 0.3;
+          break;
+        case 'rock':
+          mesh.scaling = new BABYLON.Vector3(1, 1, 1);
+          mesh.position.y = 0;
+          break;
+        case 'spike':
+          mesh.scaling = new BABYLON.Vector3(0.8, 1, 0.8);
+          mesh.position.y = 0;
+          break;
+      }
+
+      // Apply appropriate material if available
+      const materialName = type === 'log' ? 'barkBrown' :
+                          type === 'rock' ? 'castleWallSlates' : 'metalPlate';
+      const material = this.assetManager?.getMaterial(materialName);
+      if (material) {
+        mesh.material = material;
+      }
+    } else {
+      // Fallback to procedural geometry
+      const mesh = BABYLON.MeshBuilder.CreateBox(
+        `${obstacle.name}_${type}`,
+        { size: 1 },
+        this.scene
+      );
+      mesh.parent = obstacle;
+      mesh.checkCollisions = true;
+      obstacle.obstacleData.mesh = mesh;
+
+      // Apply procedural styling
+      const material = new BABYLON.StandardMaterial(`${type}_mat`, this.scene);
+
+      switch (type) {
+        case 'log':
+          mesh.scaling = new BABYLON.Vector3(3, 0.5, 0.5);
+          material.diffuseColor = new BABYLON.Color3(0.4, 0.2, 0.1);
+          break;
+        case 'rock':
+          mesh.scaling = new BABYLON.Vector3(1, 1.5, 1);
+          material.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+          break;
+        case 'spike':
+          mesh.scaling = new BABYLON.Vector3(0.5, 2, 0.5);
+          material.diffuseColor = new BABYLON.Color3(0.7, 0.7, 0.7);
+          break;
+      }
+
+      mesh.material = material;
     }
-    
-    obstacle.material = material;
   }
 
   /**
@@ -160,10 +203,10 @@ export class ObstacleManager {
 
       // Distance-based culling: hide far-ahead obstacles to reduce draw calls
       if (dz > 60) {
-        obstacle.isVisible = false;
+        obstacle.setEnabled(false);
       } else if (dz > -10) {
         // Show when within relevant range (ahead or slightly behind)
-        obstacle.isVisible = true;
+        obstacle.setEnabled(true);
       }
     }
   }
@@ -183,13 +226,19 @@ export class ObstacleManager {
 
   /**
    * Return an obstacle to the pool
-   * @param {BABYLON.Mesh} obstacle - The obstacle to return
+   * @param {BABYLON.TransformNode} obstacle - The obstacle to return
    */
   returnToPool(obstacle) {
-    obstacle.isVisible = false;
+    obstacle.setEnabled(false);
     obstacle.obstacleData.active = false;
     obstacle.obstacleData.type = null;
     obstacle.obstacleData.lane = null;
+
+    // Dispose of the mesh instance to free resources
+    if (obstacle.obstacleData.mesh) {
+      obstacle.obstacleData.mesh.dispose();
+      obstacle.obstacleData.mesh = null;
+    }
   }
 
   /**
@@ -201,11 +250,13 @@ export class ObstacleManager {
     if (!playerMesh) return false;
 
     for (const obstacle of this.obstacles) {
-      if (obstacle.obstacleData.active && obstacle.intersectsMesh(playerMesh, false)) {
-        return true;
+      if (obstacle.obstacleData.active && obstacle.obstacleData.mesh) {
+        if (obstacle.obstacleData.mesh.intersectsMesh(playerMesh, false)) {
+          return true;
+        }
       }
     }
-    
+
     return false;
   }
 
