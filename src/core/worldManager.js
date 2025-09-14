@@ -36,6 +36,10 @@ export class WorldManager {
 
     // PolyHaven integration (optional)
     this.poly = null;
+
+    // External assets
+    this.assetManager = null;
+    this.pathPrefabName = null; // e.g., 'bridge_stone' or 'bridge_wood'
   }
 
   /**
@@ -72,6 +76,20 @@ export class WorldManager {
     grassMaterial.roughness = 0.7;
     grassMaterial.metallic = 0.0;
     this.tileMaterials.push(grassMaterial);
+  }
+
+  /**
+   * Provide AssetManager for cloning prefabs
+   */
+  setAssetManager(assetManager) {
+    this.assetManager = assetManager;
+  }
+
+  /**
+   * Set a prefab name to use as the visible path tile model (if available).
+   */
+  setPathPrefab(name) {
+    this.pathPrefabName = name;
   }
 
   /**
@@ -152,37 +170,52 @@ export class WorldManager {
     // Create parent container for the tile
     const tileContainer = new BABYLON.TransformNode(name, this.scene);
 
-    // Create main path
-    const path = BABYLON.MeshBuilder.CreateBox(
-      `${name}_path`,
-      { width: this.tileWidth, height: 0.5, depth: this.tileLength },
-      this.scene
-    );
-    path.position.y = -0.25;
-    path.material = this.tileMaterials[0];
-    path.receiveShadows = true;
-    path.parent = tileContainer;
+    let usedPrefab = false;
+    if (this.assetManager && this.pathPrefabName) {
+      const prefab = this.assetManager.getAsset(this.pathPrefabName);
+      if (prefab) {
+        prefab.name = `${name}_pathPrefab`;
+        prefab.parent = tileContainer;
+        prefab.position.set(0, 0, 0);
+        usedPrefab = true;
+      }
+    }
+
+    if (!usedPrefab) {
+      // Create main path (fallback)
+      const path = BABYLON.MeshBuilder.CreateBox(
+        `${name}_path`,
+        { width: this.tileWidth, height: 0.5, depth: this.tileLength },
+        this.scene
+      );
+      path.position.y = -0.25;
+      path.material = this.tileMaterials[0];
+      path.receiveShadows = true;
+      path.parent = tileContainer;
+    }
 
     // Add side decorations (walls/barriers)
-    const leftWall = BABYLON.MeshBuilder.CreateBox(
-      `${name}_leftWall`,
-      { width: 0.5, height: 2, depth: this.tileLength },
-      this.scene
-    );
-    leftWall.position.x = -this.tileWidth / 2 - 0.25;
-    leftWall.position.y = 1;
-    leftWall.material = this.tileMaterials[2];
-    leftWall.parent = tileContainer;
+    if (!usedPrefab) {
+      const leftWall = BABYLON.MeshBuilder.CreateBox(
+        `${name}_leftWall`,
+        { width: 0.5, height: 2, depth: this.tileLength },
+        this.scene
+      );
+      leftWall.position.x = -this.tileWidth / 2 - 0.25;
+      leftWall.position.y = 1;
+      leftWall.material = this.tileMaterials[2];
+      leftWall.parent = tileContainer;
 
-    const rightWall = BABYLON.MeshBuilder.CreateBox(
-      `${name}_rightWall`,
-      { width: 0.5, height: 2, depth: this.tileLength },
-      this.scene
-    );
-    rightWall.position.x = this.tileWidth / 2 + 0.25;
-    rightWall.position.y = 1;
-    rightWall.material = this.tileMaterials[2];
-    rightWall.parent = tileContainer;
+      const rightWall = BABYLON.MeshBuilder.CreateBox(
+        `${name}_rightWall`,
+        { width: 0.5, height: 2, depth: this.tileLength },
+        this.scene
+      );
+      rightWall.position.x = this.tileWidth / 2 + 0.25;
+      rightWall.position.y = 1;
+      rightWall.material = this.tileMaterials[2];
+      rightWall.parent = tileContainer;
+    }
 
     // Store tile data
     tileContainer.tileData = {

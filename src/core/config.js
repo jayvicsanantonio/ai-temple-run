@@ -19,11 +19,11 @@ const defaultConfig = {
 
   // Blender MCP server connectivity
   mcp: {
-    enabled: true, // enabled per request; override via runtime if needed
+    enabled: false, // default: app does not connect; use scripts to generate assets
     // In dev, prefer the Vite proxy at /mcp to avoid CORS
     baseUrl: isDev ? '/mcp' : envBaseUrl,
     healthEndpoint: '/health',
-    connectOnStart: true,
+    connectOnStart: false,
     requestTimeoutMs: 8000,
     heartbeatIntervalMs: 10000,
     retry: {
@@ -114,16 +114,30 @@ const defaultConfig = {
   // Game asset pipeline controls
   gameAssets: {
     character: {
-      mode: 'PROCEDURAL', // PROCEDURAL | GLB | HYPER3D | AUTO
-      glbUrl: '',
+      mode: 'GLB', // PROCEDURAL | GLB | HYPER3D
+      glbUrl: '/assets/models/pikachu.glb',
       prompt: 'stylized runner',
-      name: 'player_h3d',
+      name: 'player_glb',
     },
     obstacles: {
       list: [
-        // { name: 'logPrefab', url: '/models/log.glb' }
+        { name: 'bridge_stone', url: '/assets/models/bridge_stone.glb' },
+        { name: 'bridge_wood', url: '/assets/models/bridge_wood.glb' },
+        { name: 'pillar', url: '/assets/models/pillar.glb' },
+        { name: 'arch_gate', url: '/assets/models/arch_gate.glb' },
+        { name: 'rope_vines', url: '/assets/models/rope_vines.glb' },
+        { name: 'skull_deco', url: '/assets/models/skull_deco.glb' },
+        { name: 'rock_deco', url: '/assets/models/rock_deco.glb' },
+        { name: 'water_plane', url: '/assets/models/water_plane.glb' }
       ],
     },
+  },
+
+  // Automatic MCP asset generation on startup
+  autoGenerate: {
+    enabled: false,
+    character: { enabled: false, name: 'pikachu' },
+    environment: { enabled: false },
   },
 };
 

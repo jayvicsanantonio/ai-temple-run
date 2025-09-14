@@ -121,6 +121,8 @@ class TempleRunGame {
       }
     }
 
+    // MCP auto-generation disabled; use scripts/generate-assets.mjs instead
+
     console.log('Game initialized successfully!');
   }
 
@@ -188,6 +190,7 @@ class TempleRunGame {
     // Initialize world manager with obstacle and coin managers
     this.worldManager = new WorldManager(this.scene, this.obstacleManager, this.coinManager);
     this.worldManager.init();
+    this.worldManager.setAssetManager?.(this.assetManager);
 
     // Initialize UI manager
     this.uiManager = new UIManager();
@@ -287,6 +290,10 @@ class TempleRunGame {
         // Provide AssetManager and prefab names to obstacle manager
         this.obstacleManager.setAssetManager?.(this.assetManager);
         this.obstacleManager.setObstaclePrefabs?.(list.map((o) => o.name));
+        // Prefer a bridge module as the visual path if available
+        const preferred =
+          list.find((o) => o.name === 'bridge_stone') || list.find((o) => o.name === 'bridge_wood');
+        if (preferred) this.worldManager.setPathPrefab?.(preferred.name);
       }
     } catch (e) {
       console.warn('Obstacle asset pipeline error:', e);
