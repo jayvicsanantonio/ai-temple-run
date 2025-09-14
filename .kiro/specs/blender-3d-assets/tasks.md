@@ -20,7 +20,7 @@
 
 ## Phase 2: Download Temple Textures from PolyHaven
 
-- [ ] 5. Download stone textures from PolyHaven
+- [x] 5. Download stone textures from PolyHaven
   - Search for: "stone", "marble", "brick" categories
   - Download 1k-2k resolution to `/public/assets/textures/stone/`
 
