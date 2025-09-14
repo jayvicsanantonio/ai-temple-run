@@ -128,12 +128,7 @@ await assetManager.loadGLBModel('/models/your-model.glb', 'modelName');
 ```
 
 ### Blender Integration
-The project is designed to work with Blender MCP for asset creation. Required animations:
-- Idle
-- Run cycle
-- Jump
-- Slide
-- Death/fall
+You can create assets in any DCC (e.g., Blender) and export them as GLB/GLTF. Import them into `public/assets/models/` and point the game config at those files.
 
 ## 🚀 Deployment
 

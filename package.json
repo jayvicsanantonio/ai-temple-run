@@ -8,8 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src/**/*.js",
-    "format": "prettier --write src/**/*.js",
-    "assets:generate": "node scripts/generate-assets.mjs"
+    "format": "prettier --write src/**/*.js"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.43.0",

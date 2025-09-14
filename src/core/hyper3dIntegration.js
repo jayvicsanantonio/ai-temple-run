@@ -17,9 +17,8 @@ function uid() {
 }
 
 export class Hyper3DIntegration {
-  constructor(assetManager, blenderMCPManager = null, overrides = {}) {
+  constructor(assetManager, overrides = {}) {
     this.assetManager = assetManager;
-    this.mcp = blenderMCPManager;
     this.cfg = { ...getConfig(), ...overrides };
     this.h3d = this.cfg.hyper3d || {};
     this.mode = this.h3d.mode || 'MAIN_SITE';

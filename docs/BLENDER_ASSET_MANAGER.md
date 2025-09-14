@@ -85,7 +85,7 @@ Hyper3D character generation:
     }
   };
   // Do not commit real keys; inject locally only.
-  // See docs/BLENDER_MCP.md for MCP config and env vars.
+  // Assets are loaded directly from public/assets; no MCP runtime needed.
 </script>
 ```
 

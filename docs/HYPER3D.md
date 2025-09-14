@@ -12,7 +12,7 @@ Implements text-to-3D character generation, job tracking, polling, and model imp
 ```js
 import { Hyper3DIntegration } from '../core/hyper3dIntegration.js';
 
-const hyper3d = new Hyper3DIntegration(assetManager, mcpManager);
+const hyper3d = new Hyper3DIntegration(assetManager);
 const { id } = await hyper3d.generateCharacterFromText('stylized runner with backpack', {
   bboxCondition: { x: 0.5, y: 1.8, z: 0.5 },
 });
@@ -47,4 +47,3 @@ Remote job statuses are normalized into: `In Progress`, `Done`, `Failed`.
 
 `importCompletedAsset` validates successful GLB load and falls back to the procedural
 player model (or a simple box) if load fails.
-

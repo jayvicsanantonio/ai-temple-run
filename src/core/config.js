@@ -7,33 +7,13 @@
  *   before the app loads (e.g., via an inline script tag in `index.html`).
  */
 
-// Read env from Vite (vite.config.js exposes BLENDER_* to import.meta.env)
+// Read env from Vite (kept for future feature flags)
 const env = typeof import.meta !== 'undefined' ? import.meta.env || {} : {};
-const envHost = env.BLENDER_HOST || env.VITE_BLENDER_HOST || 'localhost';
-const envPort = Number(env.BLENDER_PORT || env.VITE_BLENDER_PORT || 9876);
-const envBaseUrl = `http://${envHost}:${envPort}`;
-const isDev = !!(env && env.DEV);
 
 const defaultConfig = {
   debug: false,
 
-  // Blender MCP server connectivity
-  mcp: {
-    enabled: false, // default: app does not connect; use scripts to generate assets
-    // In dev, prefer the Vite proxy at /mcp to avoid CORS
-    baseUrl: isDev ? '/mcp' : envBaseUrl,
-    healthEndpoint: '/health',
-    connectOnStart: false,
-    requestTimeoutMs: 8000,
-    heartbeatIntervalMs: 10000,
-    retry: {
-      maxRetries: 5,
-      initialDelayMs: 500,
-      maxDelayMs: 6000,
-      factor: 1.8,
-      jitter: 0.25,
-    },
-  },
+  
 
   // Hyper3D integration settings (placeholders for future steps)
   hyper3d: {
@@ -128,17 +108,12 @@ const defaultConfig = {
         { name: 'rope_vines', url: '/assets/models/rope_vines.glb' },
         { name: 'skull_deco', url: '/assets/models/skull_deco.glb' },
         { name: 'rock_deco', url: '/assets/models/rock_deco.glb' },
-        { name: 'water_plane', url: '/assets/models/water_plane.glb' }
+        { name: 'water_plane', url: '/assets/models/water_plane.glb' },
       ],
     },
   },
 
-  // Automatic MCP asset generation on startup
-  autoGenerate: {
-    enabled: false,
-    character: { enabled: false, name: 'pikachu' },
-    environment: { enabled: false },
-  },
+
 };
 
 function isPlainObject(value) {

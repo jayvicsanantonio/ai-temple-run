@@ -13,10 +13,8 @@ import { WorldManager } from './core/worldManager.js';
 import { AssetManager } from './core/assetManager.js';
 import { UIManager } from './core/uiManager.js';
 import { getConfig } from './core/config.js';
-import { BlenderMCPManager } from './core/blenderMCPManager.js';
 import { Hyper3DIntegration } from './core/hyper3dIntegration.js';
 import { PolyHavenIntegration } from './core/polyHavenIntegration.js';
-import { BlenderExportIntegration } from './core/blenderExportIntegration.js';
 import { PhysicsEngineManager } from './core/physicsEngineManager.js';
 import { AssetOptimizer } from './core/assetOptimizer.js';
 import { PerformanceMonitor } from './core/performanceMonitor.js';
@@ -40,7 +38,6 @@ class TempleRunGame {
     this.uiManager = null;
     this.inputHandler = null;
     this.config = null;
-    this.mcpManager = null;
     this.hyper3d = null;
     this.polyHaven = null;
     this.blenderExport = null;
@@ -85,32 +82,16 @@ class TempleRunGame {
     // Initialize UI
     this.uiManager.init();
 
-    // Load config and optionally connect to Blender MCP
+    // Load config
     this.config = getConfig();
-    this.mcpManager = new BlenderMCPManager(this.config);
-    this.mcpManager.on('status', (status) => {
-      if (this.config.debug) {
-        console.log('[Game] MCP status event:', status);
-      }
-    });
-    if (this.config.mcp.enabled && this.config.mcp.connectOnStart) {
-      this.mcpManager.connect().catch((err) => {
-        console.warn('[Game] MCP connect error:', err?.message || err);
-      });
-    }
 
-    // Initialize Hyper3D integration (no automatic generation here)
-    this.hyper3d = new Hyper3DIntegration(this.assetManager, this.mcpManager, this.config);
+    // Initialize Hyper3D integration
+    this.hyper3d = new Hyper3DIntegration(this.assetManager, this.config);
 
     // Initialize PolyHaven integration
     this.polyHaven = new PolyHavenIntegration(this.assetManager, this.config);
 
-    // Initialize Blender export integration
-    this.blenderExport = new BlenderExportIntegration(
-      this.mcpManager,
-      this.assetManager,
-      this.config
-    );
+    //
 
     // Apply default PolyHaven textures to path/walls (best-effort)
     if (this.worldManager && this.worldManager.applyDefaultPolyHavenTextures) {
@@ -121,7 +102,7 @@ class TempleRunGame {
       }
     }
 
-    // MCP auto-generation disabled; use scripts/generate-assets.mjs instead
+    //
 
     console.log('Game initialized successfully!');
   }
