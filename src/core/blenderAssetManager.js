@@ -13,11 +13,11 @@ import { getConfig } from './config.js';
 import * as BABYLON from 'babylonjs';
 
 export class BlenderAssetManager {
-  constructor(scene, assetManager, { hyper3d, polyHaven } = {}, overrides = {}) {
+  constructor(scene, assetManager, _unused = {}, overrides = {}) {
     this.scene = scene;
     this.assetManager = assetManager;
-    this.hyper3d = hyper3d || null;
-    this.polyHaven = polyHaven || null;
+    this.hyper3d = null;
+    this.polyHaven = null;
     this.cfg = { ...getConfig(), ...overrides };
 
     // name -> { name, type, url?, status, createdAt, updatedAt, meta }

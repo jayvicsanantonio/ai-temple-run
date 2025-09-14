@@ -13,8 +13,7 @@ import { WorldManager } from './core/worldManager.js';
 import { AssetManager } from './core/assetManager.js';
 import { UIManager } from './core/uiManager.js';
 import { getConfig } from './core/config.js';
-import { Hyper3DIntegration } from './core/hyper3dIntegration.js';
-import { PolyHavenIntegration } from './core/polyHavenIntegration.js';
+//
 import { PhysicsEngineManager } from './core/physicsEngineManager.js';
 import { AssetOptimizer } from './core/assetOptimizer.js';
 import { PerformanceMonitor } from './core/performanceMonitor.js';
@@ -38,9 +37,7 @@ class TempleRunGame {
     this.uiManager = null;
     this.inputHandler = null;
     this.config = null;
-    this.hyper3d = null;
-    this.polyHaven = null;
-    this.blenderExport = null;
+    //
     this.physics = null;
     this.assetOptimizer = null;
     this.performanceMonitor = null;
@@ -70,6 +67,9 @@ class TempleRunGame {
     this.mainScene = new MainScene(this.canvas);
     this.scene = await this.mainScene.init();
 
+    // Load config (including optional external assets.json) before systems
+    this.config = await this.loadExternalAssetsConfig();
+
     // Initialize game systems
     await this.initializeSystems();
 
@@ -81,28 +81,6 @@ class TempleRunGame {
 
     // Initialize UI
     this.uiManager.init();
-
-    // Load config
-    this.config = getConfig();
-
-    // Initialize Hyper3D integration
-    this.hyper3d = new Hyper3DIntegration(this.assetManager, this.config);
-
-    // Initialize PolyHaven integration
-    this.polyHaven = new PolyHavenIntegration(this.assetManager, this.config);
-
-    //
-
-    // Apply default PolyHaven textures to path/walls (best-effort)
-    if (this.worldManager && this.worldManager.applyDefaultPolyHavenTextures) {
-      try {
-        await this.worldManager.applyDefaultPolyHavenTextures(this.polyHaven);
-      } catch (e) {
-        console.warn('PolyHaven default textures failed:', e);
-      }
-    }
-
-    //
 
     console.log('Game initialized successfully!');
   }
@@ -130,7 +108,7 @@ class TempleRunGame {
 
     // Initialize physics
     this.physics = new PhysicsEngineManager(this.scene);
-    const physicsMode = this.physics.detectAndInit();
+    this.physics.detectAndInit();
 
     // Initialize game loop
     this.gameLoop = new GameLoop(this.scene);
@@ -211,18 +189,32 @@ class TempleRunGame {
     });
 
     // Unified Blender asset manager (Hyper3D + PolyHaven + AssetManager)
-    this.blenderAssets = new BlenderAssetManager(
-      this.scene,
-      this.assetManager,
-      {
-        hyper3d: this.hyper3d,
-        polyHaven: this.polyHaven,
-      },
-      this.config
-    );
+    this.blenderAssets = new BlenderAssetManager(this.scene, this.assetManager, {}, this.config);
 
     // Kick off runtime asset pipeline (character + obstacle prefabs)
     this.setupRuntimeAssets().catch((e) => console.warn('Runtime asset setup error:', e));
+  }
+
+  /**
+   * Load optional external asset config from /assets/assets.json and merge into default config.
+   */
+  async loadExternalAssetsConfig() {
+    const base = getConfig();
+    try {
+      const res = await fetch('/assets/assets.json');
+      if (res.ok) {
+        const ext = await res.json();
+        base.gameAssets = {
+          ...base.gameAssets,
+          ...(ext || {}),
+          obstacles: ext?.obstacles || base.gameAssets?.obstacles,
+        };
+      }
+    } catch (e) {
+      // Ignore; fall back to defaults
+      console.warn('assets.json not loaded:', e?.message || e);
+    }
+    return base;
   }
 
   /**
@@ -239,15 +231,6 @@ class TempleRunGame {
           name: cfg.character.name || 'player_glb',
           priority: 10,
         });
-        if (root) {
-          this.playerController.setPlayerMesh(root);
-          this.assetOptimizer?.tryApplyLODs(root);
-        }
-      } else if (mode === 'HYPER3D' && this.hyper3d) {
-        const root = await this.blenderAssets.generateCharacterAndImport(
-          cfg.character?.prompt || 'stylized runner',
-          { name: cfg.character?.name || 'player_h3d' }
-        );
         if (root) {
           this.playerController.setPlayerMesh(root);
           this.assetOptimizer?.tryApplyLODs(root);
@@ -354,24 +337,6 @@ class TempleRunGame {
           this.playerController.setPlayerMesh(root);
           this.assetOptimizer?.tryApplyLODs(root);
           this.currentCharacterAssetName = name;
-        }
-        return;
-      }
-      if (m === 'HYPER3D' && this.hyper3d) {
-        const name = this.config.gameAssets.character.name || 'player_h3d';
-        const root = await this.blenderAssets.generateCharacterAndImport(
-          this.config.gameAssets.character.prompt || 'stylized runner',
-          { name }
-        );
-        if (root) {
-          if (this.currentCharacterAssetName && this.currentCharacterAssetName !== name) {
-            this.blenderAssets.release?.(this.currentCharacterAssetName);
-          }
-          this.playerController.setPlayerMesh(root);
-          this.assetOptimizer?.tryApplyLODs(root);
-          this.currentCharacterAssetName = name;
-        } else {
-          // generation failed; keep existing character
         }
         return;
       }

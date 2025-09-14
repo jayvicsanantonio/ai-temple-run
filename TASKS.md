@@ -1,11 +1,8 @@
 # Implementation Plan
 
-- [x] 1. Set up Blender MCP integration infrastructure
-  - Create BlenderMCPManager class to handle connections and API calls
-  - Implement error handling and reconnection logic for MCP server
-  - Add configuration management for Hyper3D and PolyHaven settings
-  - Implemented in: `src/core/blenderMCPManager.js`, `src/core/config.js`
-  - Notes: Heartbeat + exponential backoff; runtime overrides via `window.__TEMPLE_RUN_CONFIG__`.
+- [x] 1. Establish offline asset pipeline
+  - Use GLB assets stored under `public/assets/models/`
+  - Configure defaults via `src/core/config.js` or runtime overrides (`window.__TEMPLE_RUN_CONFIG__`)
   - _Requirements: 1.1, 1.2, 1.3_
 
 - [x] 2. Implement Hyper3D character generation system
@@ -41,17 +38,15 @@
     - Included simple texture atlas builder `createTextureAtlas`
     - _Requirements: 2.1, 2.4, 2.5_
 
-- [x] 4. Create GLB export pipeline
-  - [x] 4.1 Implement automated GLB export from Blender
-    - Added `BlenderExportIntegration.exportAsGLB` with LOD/preserveAnimations/embedMaterials options
-    - Job polling via MCP and runtime load helper
-    - Implemented in: `src/core/blenderExportIntegration.js`
+- [x] 4. Prepare GLB usage
+  - [x] 4.1 Support loading GLBs and caching
+    - Implemented in: `src/core/blenderAssetManager.js`
     - _Requirements: 2.1, 2.2, 2.3_
 
   - [x] 4.2 Implement texture compression system
-    - Added client-side hooks for KTX2/Basis via MCP `compressTextures`
+    - Added client-side hooks for KTX2/Basis
     - Runtime support detection and KTX2 transcoder config utils
-    - Implemented in: `src/core/blenderExportIntegration.js`, `src/utils/textureCompression.js`
+    - Implemented in: `src/utils/textureCompression.js`
     - _Requirements: 2.3, 6.2, 6.5_
 
 - [x] 5. Integrate physics engine (Ammo.js or Cannon.js)
@@ -100,7 +95,7 @@
 
 - [x] 8. Create comprehensive asset management system
   - [x] 8.1 Implement BlenderAssetManager integration
-    - Unified manager combining Hyper3D + PolyHaven + AssetManager
+    - Unified GLB loader/caching manager
     - Asset caching with ref-counts, metadata registry, validation helpers
     - Implemented in: `src/core/blenderAssetManager.js`
     - _Requirements: 1.1, 1.2, 2.1, 2.2_
@@ -113,7 +108,7 @@
 
 - [x] 9. Implement error handling and fallback systems
   - [x] 9.1 Create comprehensive error handling classes
-    - Added `AssetLoadingError`, `PhysicsEngineError` in `src/utils/errors.js` (BlenderMCPError already present)
+    - Added `AssetLoadingError`, `PhysicsEngineError` in `src/utils/errors.js`
     - Graceful degradation to placeholder meshes in `AssetManager.createPlaceholderMesh`
     - Basic logger with ring buffer in `src/utils/logger.js`
     - _Requirements: 1.3, 3.1, 5.5_
@@ -142,8 +137,8 @@
     - Obstacles registered/unregistered with physics manager
     - _Requirements: 3.3, 5.3, 5.5_
 
-  - [x] 10.4 Implement complete asset pipeline integration
-    - Blender MCP generation, runtime GLB loading, and caching integrated
+- [x] 10.4 Integrate offline assets with game engine
+    - Runtime GLB loading and caching integrated
     - Unified manager (`BlenderAssetManager`) used by game; performance monitor present
     - Implemented in: `src/index.js`, `src/core/blenderAssetManager.js`, `src/core/config.js`
     - _Requirements: 2.2, 2.3, 6.1, 6.5_

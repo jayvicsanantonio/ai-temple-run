@@ -1,0 +1,13 @@
+{
+  "character": { "glbUrl": "/assets/models/pikachu.glb", "name": "player_glb", "mode": "GLB" },
+  "obstacles": [
+    { "name": "bridge_stone", "glbUrl": "/assets/models/bridge_stone.glb" },
+    { "name": "bridge_wood", "glbUrl": "/assets/models/bridge_wood.glb" },
+    { "name": "pillar", "glbUrl": "/assets/models/pillar.glb" },
+    { "name": "arch_gate", "glbUrl": "/assets/models/arch_gate.glb" },
+    { "name": "rope_vines", "glbUrl": "/assets/models/rope_vines.glb" },
+    { "name": "skull_deco", "glbUrl": "/assets/models/skull_deco.glb" },
+    { "name": "rock_deco", "glbUrl": "/assets/models/rock_deco.glb" },
+    { "name": "water_plane", "glbUrl": "/assets/models/water_plane.glb" }
+  ]
+}

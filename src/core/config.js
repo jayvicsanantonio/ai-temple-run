@@ -7,13 +7,10 @@
  *   before the app loads (e.g., via an inline script tag in `index.html`).
  */
 
-// Read env from Vite (kept for future feature flags)
-const env = typeof import.meta !== 'undefined' ? import.meta.env || {} : {};
+// No environment-derived configuration required
 
 const defaultConfig = {
   debug: false,
-
-  
 
   // Hyper3D integration settings (placeholders for future steps)
   hyper3d: {
@@ -112,8 +109,6 @@ const defaultConfig = {
       ],
     },
   },
-
-
 };
 
 function isPlainObject(value) {

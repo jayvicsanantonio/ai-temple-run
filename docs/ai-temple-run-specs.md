@@ -1,6 +1,6 @@
 # Temple Run–Like Web App: Technical Specifications
 
-This document describes the technologies, frameworks, and workflows required to build a Temple Run–like endless runner game as a **web application**. It is designed to be **AI agent–friendly**, meaning all components are explicitly defined with clear roles and interactions. The project will integrate **Blender MCP** for asset creation.
+This document describes the technologies, frameworks, and workflows required to build a Temple Run–like endless runner game as a **web application**. It is designed to be **AI agent–friendly**, meaning all components are explicitly defined with clear roles and interactions. Assets are created offline (e.g., Blender) and exported as GLB/GLTF.
 
 ---
 
@@ -20,7 +20,7 @@ This document describes the technologies, frameworks, and workflows required to 
 ## 2. Core Technology Stack
 
 ### 2.1 Asset Creation
-- **Blender + Blender MCP**
+- **Blender (offline)**
   - Role: Model, texture, rig, and animate characters, environments, and obstacles.
   - Export Format: `.glb` / `.gltf` (industry standard for web delivery).
   - Animations required:
@@ -189,7 +189,7 @@ project-root/
 ## 6. Development Workflow
 
 1. **Asset Creation**
-   - Use Blender MCP to build models and animations.
+   - Build models and animations in Blender (or any DCC).
    - Export assets to `.glb/.gltf`.
 
 2. **Integration**
