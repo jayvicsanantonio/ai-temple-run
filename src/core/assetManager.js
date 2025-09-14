@@ -14,6 +14,18 @@ export class AssetManager {
     this.materials = {};
     this.loadingProgress = 0;
     this.isLoading = false;
+    this.assetBasePath = '/assets/';
+    this.modelPaths = {
+      pathways: 'models/pathways/',
+      architecture: 'models/architecture/',
+      obstacles: 'models/obstacles/',
+      decorations: 'models/decorations/'
+    };
+    this.texturePaths = {
+      stone: 'textures/stone/',
+      metal: 'textures/metal/',
+      organic: 'textures/organic/'
+    };
   }
 
   /**
@@ -21,14 +33,20 @@ export class AssetManager {
    */
   async init() {
     this.isLoading = true;
-    
+
     try {
-      // Create procedural assets for now
+      // Load textures first
+      await this.loadTextures();
+
+      // Load GLB models
+      await this.loadGLBModels();
+
+      // Create procedural assets as fallbacks
       await this.createProceduralAssets();
-      
-      // Setup materials
+
+      // Setup materials with loaded textures
       this.createMaterials();
-      
+
       console.log('All assets loaded successfully');
     } catch (error) {
       console.error('Error loading assets:', error);
@@ -39,7 +57,119 @@ export class AssetManager {
   }
 
   /**
-   * Create procedural assets (placeholder until real models are available)
+   * Load all GLB models from generated assets
+   */
+  async loadGLBModels() {
+    const modelAssets = [
+      // Pathway models
+      { path: 'pathways/ancient_stone_pathway_segment.glb', name: 'pathwaySegment' },
+      { path: 'pathways/curved_temple_path.glb', name: 'curvedPath' },
+      { path: 'pathways/temple_intersection.glb', name: 'pathIntersection' },
+
+      // Architecture models
+      { path: 'architecture/ornate_stone_pillar.glb', name: 'stonePillar' },
+      { path: 'architecture/temple_wall_segment.glb', name: 'templeWall' },
+      { path: 'architecture/stone_bridge_platform.glb', name: 'bridgePlatform' },
+
+      // Obstacle models
+      { path: 'obstacles/fallen_temple_log.glb', name: 'logObstacle' },
+      { path: 'obstacles/weathered_stone_block.glb', name: 'rockObstacle' },
+      { path: 'obstacles/ancient_spike_trap.glb', name: 'spikeObstacle' },
+
+      // Decoration models
+      { path: 'decorations/temple_tree_with_vines.glb', name: 'tree' },
+      { path: 'decorations/moss_covered_stone.glb', name: 'mossStone' },
+      { path: 'decorations/ancient_carved_symbol.glb', name: 'carvedSymbol' }
+    ];
+
+    const loadPromises = modelAssets.map(async (asset) => {
+      const url = this.assetBasePath + 'models/' + asset.path;
+      try {
+        await this.loadGLBModel(url, asset.name);
+        console.log(`Loaded GLB model: ${asset.name}`);
+      } catch (error) {
+        console.warn(`Failed to load GLB model ${asset.name}, will use procedural fallback`);
+      }
+    });
+
+    await Promise.allSettled(loadPromises);
+  }
+
+  /**
+   * Load all texture sets from PolyHaven assets
+   */
+  async loadTextures() {
+    const textureCategories = {
+      stone: [
+        'castle_wall_slates',
+        'broken_wall',
+        'dry_riverbed_rock',
+        'cliff_side',
+        'brick_wall'
+      ],
+      metal: [
+        'metal_plate',
+        'green_metal_rust',
+        'blue_metal_plate'
+      ],
+      organic: [
+        'bark_brown',
+        'brown_mud',
+        'fine_grained_wood'
+      ]
+    };
+
+    const loadPromises = [];
+
+    for (const [category, materials] of Object.entries(textureCategories)) {
+      for (const material of materials) {
+        const materialPath = this.assetBasePath + this.texturePaths[category] + material + '/';
+
+        // Define texture types to load
+        const textureTypes = ['Diffuse', 'nor_dx', 'Rough', 'AO', 'Displacement'];
+
+        for (const type of textureTypes) {
+          const textureName = `${material}_${type}`;
+          const textureUrl = materialPath + textureName + '.jpg';
+
+          loadPromises.push(this.loadTexture(textureUrl, textureName, category));
+        }
+      }
+    }
+
+    await Promise.allSettled(loadPromises);
+  }
+
+  /**
+   * Load a single texture
+   */
+  async loadTexture(url, name, category) {
+    return new Promise((resolve, reject) => {
+      const texture = new BABYLON.Texture(
+        url,
+        this.scene,
+        true, // noMipmaps
+        false, // invertY
+        BABYLON.Texture.TRILINEAR_SAMPLINGMODE,
+        () => {
+          // Success callback
+          if (!this.textures[category]) {
+            this.textures[category] = {};
+          }
+          this.textures[category][name] = texture;
+          resolve(texture);
+        },
+        (message) => {
+          // Error callback
+          console.warn(`Failed to load texture: ${name}`);
+          reject(new Error(message));
+        }
+      );
+    });
+  }
+
+  /**
+   * Create procedural assets (fallbacks for when GLB models fail to load)
    */
   async createProceduralAssets() {
     // Create player character
@@ -305,23 +435,154 @@ export class AssetManager {
   }
 
   /**
-   * Create materials for various surfaces
+   * Create materials using loaded PolyHaven textures
    */
   createMaterials() {
+    // Stone materials
+    this.createStoneMaterials();
+
+    // Metal materials
+    this.createMetalMaterials();
+
+    // Organic materials
+    this.createOrganicMaterials();
+
+    // Fallback procedural materials
+    this.createFallbackMaterials();
+  }
+
+  /**
+   * Create PBR materials for stone textures
+   */
+  createStoneMaterials() {
+    const stoneTextures = ['castle_wall_slates', 'broken_wall', 'dry_riverbed_rock', 'cliff_side', 'brick_wall'];
+
+    stoneTextures.forEach(materialName => {
+      const pbrMat = new BABYLON.PBRMaterial(`${materialName}_material`, this.scene);
+
+      // Apply textures if available
+      if (this.textures.stone) {
+        const diffuseTex = this.textures.stone[`${materialName}_Diffuse`];
+        const normalTex = this.textures.stone[`${materialName}_nor_dx`];
+        const roughnessTex = this.textures.stone[`${materialName}_Rough`];
+        const aoTex = this.textures.stone[`${materialName}_AO`];
+
+        if (diffuseTex) pbrMat.baseTexture = diffuseTex;
+        if (normalTex) pbrMat.bumpTexture = normalTex;
+        if (roughnessTex) pbrMat.metallicTexture = roughnessTex;
+        if (aoTex) pbrMat.lightmapTexture = aoTex;
+
+        // PBR properties for stone
+        pbrMat.baseColor = new BABYLON.Color3(1, 1, 1);
+        pbrMat.roughness = 0.9;
+        pbrMat.metallic = 0.0;
+      } else {
+        // Fallback colors
+        pbrMat.baseColor = new BABYLON.Color3(0.45, 0.4, 0.35);
+        pbrMat.roughness = 0.8;
+        pbrMat.metallic = 0.0;
+      }
+
+      this.materials[materialName] = pbrMat;
+    });
+  }
+
+  /**
+   * Create PBR materials for metal textures
+   */
+  createMetalMaterials() {
+    const metalTextures = ['metal_plate', 'green_metal_rust', 'blue_metal_plate'];
+
+    metalTextures.forEach(materialName => {
+      const pbrMat = new BABYLON.PBRMaterial(`${materialName}_material`, this.scene);
+
+      // Apply textures if available
+      if (this.textures.metal) {
+        const diffuseTex = this.textures.metal[`${materialName}_Diffuse`];
+        const normalTex = this.textures.metal[`${materialName}_nor_dx`];
+        const roughnessTex = this.textures.metal[`${materialName}_Rough`];
+        const aoTex = this.textures.metal[`${materialName}_AO`];
+
+        if (diffuseTex) pbrMat.baseTexture = diffuseTex;
+        if (normalTex) pbrMat.bumpTexture = normalTex;
+        if (roughnessTex) pbrMat.metallicTexture = roughnessTex;
+        if (aoTex) pbrMat.lightmapTexture = aoTex;
+
+        // PBR properties for metal
+        pbrMat.baseColor = new BABYLON.Color3(1, 1, 1);
+        pbrMat.roughness = materialName.includes('rust') ? 0.7 : 0.3;
+        pbrMat.metallic = materialName.includes('rust') ? 0.6 : 0.9;
+      } else {
+        // Fallback colors
+        pbrMat.baseColor = new BABYLON.Color3(0.6, 0.6, 0.6);
+        pbrMat.roughness = 0.4;
+        pbrMat.metallic = 0.8;
+      }
+
+      this.materials[materialName] = pbrMat;
+    });
+  }
+
+  /**
+   * Create PBR materials for organic textures
+   */
+  createOrganicMaterials() {
+    const organicTextures = ['bark_brown', 'brown_mud', 'fine_grained_wood'];
+
+    organicTextures.forEach(materialName => {
+      const pbrMat = new BABYLON.PBRMaterial(`${materialName}_material`, this.scene);
+
+      // Apply textures if available
+      if (this.textures.organic) {
+        const diffuseTex = this.textures.organic[`${materialName}_Diffuse`];
+        const normalTex = this.textures.organic[`${materialName}_nor_dx`];
+        const roughnessTex = this.textures.organic[`${materialName}_Rough`];
+        const aoTex = this.textures.organic[`${materialName}_AO`];
+
+        if (diffuseTex) pbrMat.baseTexture = diffuseTex;
+        if (normalTex) pbrMat.bumpTexture = normalTex;
+        if (roughnessTex) pbrMat.metallicTexture = roughnessTex;
+        if (aoTex) pbrMat.lightmapTexture = aoTex;
+
+        // PBR properties for organic materials
+        pbrMat.baseColor = new BABYLON.Color3(1, 1, 1);
+        pbrMat.roughness = 0.8;
+        pbrMat.metallic = 0.0;
+      } else {
+        // Fallback colors
+        if (materialName.includes('wood')) {
+          pbrMat.baseColor = new BABYLON.Color3(0.4, 0.25, 0.1);
+        } else if (materialName.includes('mud')) {
+          pbrMat.baseColor = new BABYLON.Color3(0.3, 0.2, 0.15);
+        } else {
+          pbrMat.baseColor = new BABYLON.Color3(0.35, 0.25, 0.15);
+        }
+        pbrMat.roughness = 0.9;
+        pbrMat.metallic = 0.0;
+      }
+
+      this.materials[materialName] = pbrMat;
+    });
+  }
+
+  /**
+   * Create fallback procedural materials
+   */
+  createFallbackMaterials() {
     // Path material with texture effect
     const pathMat = new BABYLON.StandardMaterial('pathMaterial', this.scene);
     pathMat.diffuseColor = new BABYLON.Color3(0.35, 0.3, 0.25);
     pathMat.specularColor = new BABYLON.Color3(0, 0, 0);
     pathMat.bumpTexture = this.createProceduralTexture('bump');
     this.materials.path = pathMat;
-    
+
     // Grass material
     const grassMat = new BABYLON.StandardMaterial('grassMaterial', this.scene);
     grassMat.diffuseColor = new BABYLON.Color3(0.25, 0.45, 0.15);
     grassMat.specularColor = new BABYLON.Color3(0, 0, 0);
     this.materials.grass = grassMat;
-    
-    // Stone material
+
+    // Generic stone material
     const stoneMat = new BABYLON.StandardMaterial('stoneMaterial', this.scene);
     stoneMat.diffuseColor = new BABYLON.Color3(0.45, 0.4, 0.35);
     stoneMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
@@ -356,7 +617,7 @@ export class AssetManager {
   }
 
   /**
-   * Get a clone of an asset
+   * Get a clone of an asset (prioritizes GLB models over procedural)
    */
   getAsset(assetName) {
     if (this.assets[assetName]) {
@@ -365,6 +626,44 @@ export class AssetManager {
       return clone;
     }
     return null;
+  }
+
+  /**
+   * Get a material by name
+   */
+  getMaterial(materialName) {
+    return this.materials[materialName] || this.materials.stone;
+  }
+
+  /**
+   * Get a texture by category and name
+   */
+  getTexture(category, textureName) {
+    return this.textures[category] && this.textures[category][textureName];
+  }
+
+  /**
+   * Apply a material from our loaded textures to a mesh
+   */
+  applyMaterial(mesh, materialName) {
+    const material = this.getMaterial(materialName);
+    if (material && mesh) {
+      mesh.material = material;
+    }
+  }
+
+  /**
+   * Get asset loading progress
+   */
+  getLoadingProgress() {
+    return this.loadingProgress;
+  }
+
+  /**
+   * Check if assets are currently loading
+   */
+  isAssetsLoading() {
+    return this.isLoading;
   }
 
   /**
