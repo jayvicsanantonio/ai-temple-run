@@ -41,17 +41,17 @@
     - Included simple texture atlas builder `createTextureAtlas`
     - _Requirements: 2.1, 2.4, 2.5_
 
-- [ ] 4. Create GLB export pipeline
-  - [ ] 4.1 Implement automated GLB export from Blender
-    - Create exportAsGLB method with LOD level support
-    - Add animation data preservation during export
-    - Implement material and texture embedding in GLB files
+- [x] 4. Create GLB export pipeline
+  - [x] 4.1 Implement automated GLB export from Blender
+    - Added `BlenderExportIntegration.exportAsGLB` with LOD/preserveAnimations/embedMaterials options
+    - Job polling via MCP and runtime load helper
+    - Implemented in: `src/core/blenderExportIntegration.js`
     - _Requirements: 2.1, 2.2, 2.3_
 
-  - [ ] 4.2 Implement texture compression system
-    - Add KTX2/Basis texture compression for performance
-    - Create automatic compression based on target platform
-    - Implement quality vs. size optimization algorithms
+  - [x] 4.2 Implement texture compression system
+    - Added client-side hooks for KTX2/Basis via MCP `compressTextures`
+    - Runtime support detection and KTX2 transcoder config utils
+    - Implemented in: `src/core/blenderExportIntegration.js`, `src/utils/textureCompression.js`
     - _Requirements: 2.3, 6.2, 6.5_
 
 - [ ] 5. Integrate physics engine (Ammo.js or Cannon.js)

@@ -67,6 +67,20 @@ const defaultConfig = {
       search: '/assets',
     },
   },
+
+  // Export and compression settings
+  export: {
+    defaultLOD: [
+      { name: 'LOD0', ratio: 1 },
+      { name: 'LOD1', ratio: 0.6 },
+      { name: 'LOD2', ratio: 0.35 },
+    ],
+    embedMaterials: true,
+    preserveAnimations: true,
+    compressTextures: false,
+    compressionProfile: 'auto', // auto | mobile | desktop
+    compressionQuality: 0.8,
+  },
 };
 
 function isPlainObject(value) {
