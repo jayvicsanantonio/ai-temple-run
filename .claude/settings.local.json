@@ -5,7 +5,11 @@
       "mcp__blender__poll_rodin_job_status",
       "mcp__blender__import_generated_asset",
       "Bash(mkdir:*)",
-      "mcp__blender__execute_blender_code"
+      "mcp__blender__execute_blender_code",
+      "mcp__blender__get_polyhaven_status",
+      "mcp__blender__search_polyhaven_assets",
+      "Read(//Users/jayvicsanantonio/**)",
+      "mcp__blender__download_polyhaven_asset"
     ],
     "deny": [],
     "ask": []
