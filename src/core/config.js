@@ -81,6 +81,16 @@ const defaultConfig = {
     compressionProfile: 'auto', // auto | mobile | desktop
     compressionQuality: 0.8,
   },
+
+  // Physics settings
+  physics: {
+    engine: 'SIMPLE', // AUTO | AMMO | CANNON | SIMPLE
+    gravity: -20,
+    lateralAccel: 40,
+    lateralMaxSpeed: 12,
+    jumpImpulse: 9,
+    friction: 8,
+  },
 };
 
 function isPlainObject(value) {

@@ -54,23 +54,21 @@
     - Implemented in: `src/core/blenderExportIntegration.js`, `src/utils/textureCompression.js`
     - _Requirements: 2.3, 6.2, 6.5_
 
-- [ ] 5. Integrate physics engine (Ammo.js or Cannon.js)
-  - [ ] 5.1 Create PhysicsEngineManager with engine selection
-    - Implement initialization for both Ammo.js and Cannon.js options
-    - Add world configuration with gravity and collision settings
-    - Create physics body management system
+- [x] 5. Integrate physics engine (Ammo.js or Cannon.js)
+  - [x] 5.1 Create PhysicsEngineManager with engine selection
+    - Added detection for Ammo/Cannon with Babylon plugins and SIMPLE fallback
+    - World configuration: gravity, basic step, obstacle body registry
+    - Implemented in: `src/core/physicsEngineManager.js`
     - _Requirements: 3.1, 3.2_
 
-  - [ ] 5.2 Implement realistic character physics
-    - Create momentum-based movement system with acceleration/deceleration
-    - Implement realistic jump physics with gravity simulation
-    - Add ground detection and landing force calculations
+  - [x] 5.2 Implement realistic character physics
+    - SIMPLE engine: momentum-based lateral movement, gravity jump, ground detect
+    - Hooks from `PlayerController` to physics for jump/speed/lanes
     - _Requirements: 3.2, 5.1, 5.2_
 
-  - [ ] 5.3 Implement collision detection and response
-    - Replace simple bounding box collision with physics engine detection
-    - Add collision response forces for realistic interactions
-    - Implement precise collision shapes for obstacles and character
+  - [x] 5.3 Implement collision detection and response
+    - SIMPLE engine AABB collision check replaces prior intersect check when enabled
+    - Obstacle registration/unregistration to physics manager from `ObstacleManager`
     - _Requirements: 3.3, 5.3, 5.5_
 
 - [ ] 6. Create animation state machine

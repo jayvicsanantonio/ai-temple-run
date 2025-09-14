@@ -11,6 +11,7 @@ export class PlayerController {
     this.player = null;
     this.playerMesh = null; // Visual mesh
     this.collider = null; // Collision box
+    this.physics = null; // Optional physics manager
     this.isJumping = false;
     this.isSliding = false;
     this.isDead = false;
@@ -67,6 +68,14 @@ export class PlayerController {
   }
 
   /**
+   * Enable physics-controlled movement.
+   * @param {import('./physicsEngineManager.js').PhysicsEngineManager} physics
+   */
+  enablePhysics(physics) {
+    this.physics = physics;
+  }
+
+  /**
    * Replace the player's visual/root mesh with a new mesh.
    * Preserves position and collider.
    * @param {BABYLON.Mesh|BABYLON.TransformNode} newMesh
@@ -120,17 +129,23 @@ export class PlayerController {
   update(deltaTime) {
     if (!this.player || this.isDead) return;
 
-    // Forward movement
-    this.player.position.z += this.forwardSpeed * deltaTime;
+    if (!this.physics) {
+      // Forward movement
+      this.player.position.z += this.forwardSpeed * deltaTime;
 
-    // Lane switching
-    this.updateLanePosition(deltaTime);
+      // Lane switching
+      this.updateLanePosition(deltaTime);
 
-    // Jump logic
-    this.updateJump(deltaTime);
+      // Jump logic
+      this.updateJump(deltaTime);
 
-    // Slide logic
-    this.updateSlide(deltaTime);
+      // Slide logic
+      this.updateSlide(deltaTime);
+    } else {
+      // Physics-driven: only handle visuals (slide/jump anim cues)
+      this.updateSlide(deltaTime);
+      if (this.isJumping) this.updateJump(deltaTime);
+    }
   }
 
   /**
@@ -138,6 +153,7 @@ export class PlayerController {
    * @param {number} deltaTime - Time since last update
    */
   updateLanePosition(deltaTime) {
+    if (this.physics) return; // physics handles X targeting
     const targetX = this.lanes[this.targetLane];
     const currentX = this.player.position.x;
 
@@ -210,6 +226,7 @@ export class PlayerController {
   moveLeft() {
     if (this.targetLane > 0 && !this.isDead) {
       this.targetLane--;
+      if (this.physics) this.physics.setTargetLaneX(this.lanes[this.targetLane]);
     }
   }
 
@@ -219,6 +236,7 @@ export class PlayerController {
   moveRight() {
     if (this.targetLane < this.lanes.length - 1 && !this.isDead) {
       this.targetLane++;
+      if (this.physics) this.physics.setTargetLaneX(this.lanes[this.targetLane]);
     }
   }
 
@@ -227,6 +245,7 @@ export class PlayerController {
    */
   jump() {
     if (!this.isJumping && !this.isSliding && !this.isDead) {
+      if (this.physics) this.physics.jump();
       this.isJumping = true;
       this.jumpTime = 0;
       this.playAnimation('jump');
@@ -328,5 +347,6 @@ export class PlayerController {
    */
   setForwardSpeed(speed) {
     this.forwardSpeed = Math.max(5, Math.min(30, speed));
+    if (this.physics) this.physics.setForwardSpeed(this.forwardSpeed);
   }
 }

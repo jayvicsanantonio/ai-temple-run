@@ -17,6 +17,7 @@ import { BlenderMCPManager } from './core/blenderMCPManager.js';
 import { Hyper3DIntegration } from './core/hyper3dIntegration.js';
 import { PolyHavenIntegration } from './core/polyHavenIntegration.js';
 import { BlenderExportIntegration } from './core/blenderExportIntegration.js';
+import { PhysicsEngineManager } from './core/physicsEngineManager.js';
 import { InputHandler } from './utils/inputHandler.js';
 
 // Import styles
@@ -40,6 +41,7 @@ class TempleRunGame {
     this.hyper3d = null;
     this.polyHaven = null;
     this.blenderExport = null;
+    this.physics = null;
 
     // Game state
     this.isPlaying = false;
@@ -127,6 +129,10 @@ class TempleRunGame {
     this.assetManager = new AssetManager(this.scene);
     await this.assetManager.init();
 
+    // Initialize physics
+    this.physics = new PhysicsEngineManager(this.scene);
+    const physicsMode = this.physics.detectAndInit();
+
     // Initialize game loop
     this.gameLoop = new GameLoop(this.scene);
 
@@ -134,10 +140,22 @@ class TempleRunGame {
     this.playerController = new PlayerController(this.scene);
     const playerMesh = this.assetManager.getAsset('player') || this.createPlayerPlaceholder();
     this.playerController.init(playerMesh);
+    // Connect player to physics
+    if (this.physics) {
+      this.playerController.enablePhysics(this.physics);
+      this.physics.attachPlayer(this.playerController.player, this.playerController.collider, {
+        forwardSpeed: this.playerController.forwardSpeed,
+        baseY: this.playerController.baseY,
+        laneX: 0,
+      });
+    }
 
     // Initialize obstacle manager
     this.obstacleManager = new ObstacleManager(this.scene);
     this.obstacleManager.init();
+    if (this.physics && this.obstacleManager.setPhysicsManager) {
+      this.obstacleManager.setPhysicsManager(this.physics);
+    }
 
     // Initialize coin manager
     this.coinManager = new CoinManager(this.scene);
@@ -159,6 +177,12 @@ class TempleRunGame {
     this.gameLoop.registerSystem(this.worldManager);
     this.gameLoop.registerSystem({
       update: (deltaTime) => this.updateGame(deltaTime),
+    });
+    // Physics step last
+    this.gameLoop.registerSystem({
+      update: (dt) => {
+        if (this.physics) this.physics.update(dt);
+      },
     });
   }
 
@@ -302,8 +326,11 @@ class TempleRunGame {
       console.log(`Collected ${coinsCollected} coins!`);
     }
 
-    // Check for collisions with obstacles using the collider mesh
-    if (this.obstacleManager.checkCollision(this.playerController.collider)) {
+    // Physics-aware collision detection
+    const hit = this.physics
+      ? this.physics.checkCollisionWithObstacles()
+      : this.obstacleManager.checkCollision(this.playerController.collider);
+    if (hit) {
       this.gameOver();
     }
 
