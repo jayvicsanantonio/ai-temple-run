@@ -10,6 +10,7 @@
  */
 
 import { getConfig } from './config.js';
+import * as BABYLON from 'babylonjs';
 
 export class BlenderAssetManager {
   constructor(scene, assetManager, { hyper3d, polyHaven } = {}, overrides = {}) {
@@ -128,6 +129,11 @@ export class BlenderAssetManager {
           rec.status = 'ready';
         }
         rec.updatedAt = this._now();
+        // Optional material/UV validation
+        try {
+          const report = this.validateMaterials(this.cache.get(name)?.root);
+          if (report) rec.meta.validation = report;
+        } catch {}
         return root;
       },
       resolve: null,
@@ -199,6 +205,10 @@ export class BlenderAssetManager {
       rec.status = 'ready';
       rec.meta = { ...(rec.meta || {}), job };
       rec.updatedAt = this._now();
+      try {
+        const report = this.validateMaterials(root);
+        if (report) rec.meta.validation = report;
+      } catch {}
       return root;
     }
     const rec = this.registry.get(finalName);
@@ -221,5 +231,19 @@ export class BlenderAssetManager {
       }
     }
     return this.polyHaven.applyTextureToObject(mesh, maps, { materialName: `${id}_mat` });
+  }
+
+  // ---------- Validation ----------
+  validateMaterials(root) {
+    if (!root || !BABYLON || !root.getChildMeshes) return null;
+    const meshes = root.getChildMeshes ? root.getChildMeshes(true) : [];
+    let missingUV = 0;
+    let missingMat = 0;
+    for (const m of meshes) {
+      if (!m.material) missingMat += 1;
+      const hasUV = !!m.getVerticesData && !!m.getVerticesData(BABYLON.VertexBuffer.UVKind);
+      if (!hasUV) missingUV += 1;
+    }
+    return { checked: meshes.length, missingUV, missingMat };
   }
 }

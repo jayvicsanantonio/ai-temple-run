@@ -39,9 +39,14 @@ export class PhysicsEngineManager {
       grounded: true,
       ragdollActive: false,
       rotVel: new BABYLON.Vector3(0, 0, 0),
+      jumpHeight: 1.5,
+      lastGrounded: true,
     };
     this.obstacles = new Set();
     this.gravity = this.settings.gravity ?? -20;
+    this.accuracyScale = 1.0;
+
+    this._listeners = new Map(); // event -> Set(cb)
   }
 
   detectAndInit() {
@@ -101,7 +106,11 @@ export class PhysicsEngineManager {
   jump() {
     if (!this.player) return;
     if (this.playerState.grounded) {
-      this.playerState.vel.y = this.settings.jumpImpulse ?? 9;
+      // Compute initial velocity for consistent jump height: v0 = sqrt(2 * g * h)
+      const g = Math.abs(this.gravity);
+      const h = this.playerState.jumpHeight || 1.5;
+      const v0 = Math.sqrt(2 * g * h);
+      this.playerState.vel.y = v0;
       this.playerState.grounded = false;
     }
   }
@@ -120,7 +129,7 @@ export class PhysicsEngineManager {
 
   update(deltaTime) {
     if (this.mode !== 'SIMPLE' || !this.player) return;
-    const dt = clamp(deltaTime, 0, 0.05);
+    const dt = clamp(deltaTime, 0, 0.05) * this.accuracyScale;
 
     // Lateral control towards target lane
     const dx = this.playerState.targetLaneX - this.player.position.x;
@@ -151,8 +160,10 @@ export class PhysicsEngineManager {
     if (this.player.position.y <= this.playerState.baseY) {
       this.player.position.y = this.playerState.baseY;
       if (!this.playerState.grounded && this.playerState.vel.y < 0) {
-        // Landing impulse dampen
+        // Landing impulse dampen and emit event with impact strength
+        const impact = Math.abs(this.playerState.vel.y);
         this.playerState.vel.y = 0;
+        this._emit('land', { impact });
       }
       this.playerState.grounded = true;
     } else {
@@ -168,6 +179,26 @@ export class PhysicsEngineManager {
     this.playerState.vel.y = Math.max(this.playerState.vel.y, 5);
     this.playerState.rotVel.x = (Math.random() - 0.5) * 4;
     this.playerState.rotVel.z = (Math.random() - 0.5) * 6;
+  }
+
+  setAccuracyScale(scale) {
+    this.accuracyScale = clamp(scale || 1, 0.5, 1);
+  }
+
+  // Events
+  on(event, cb) {
+    if (!this._listeners.has(event)) this._listeners.set(event, new Set());
+    this._listeners.get(event).add(cb);
+    return () => this.off(event, cb);
+  }
+  off(event, cb) {
+    const s = this._listeners.get(event);
+    if (s) s.delete(cb);
+  }
+  _emit(event, payload) {
+    const s = this._listeners.get(event);
+    if (!s) return;
+    for (const cb of s) cb(payload);
   }
 
   // Physics-based collision check for SIMPLE engine using AABB vs AABB

@@ -75,6 +75,33 @@ export class PlayerController {
    */
   enablePhysics(physics) {
     this.physics = physics;
+    // Landing feedback
+    if (this.physics && typeof this.physics.on === 'function') {
+      this._offLand = this.physics.on('land', ({ impact }) => {
+        if (this.isDead || this.isSliding) return;
+        // Quick squash on landing proportional to impact
+        const squash = Math.max(0.8, 1 - Math.min(impact / 20, 0.2));
+        if (this.playerMesh) {
+          BABYLON.Animation.CreateAndStartAnimation(
+            'landSquash',
+            this.playerMesh,
+            'scaling.y',
+            30,
+            4,
+            this.playerMesh.scaling.y,
+            squash,
+            BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+          );
+          setTimeout(() => {
+            if (this.playerMesh) this.playerMesh.scaling.y = 1;
+          }, 150);
+        }
+        // End jump state smoothly
+        this.isJumping = false;
+        this.jumpTime = 0;
+        if (!this.isDead) this.playAnimation('run', 0.1);
+      });
+    }
   }
 
   /**
@@ -222,6 +249,10 @@ export class PlayerController {
       if (this.playerMesh) {
         this.playerMesh.scaling.y = 1 - slideProgress * 0.4;
       }
+      // Reduce collider height for precise sliding under obstacles
+      if (this.collider) {
+        this.collider.scaling.y = 0.6;
+      }
 
       if (this.slideTime >= this.maxSlideTime) {
         this.endSlide();
@@ -305,6 +336,9 @@ export class PlayerController {
     this.player.position.y = this.baseY;
     if (this.playerMesh) {
       this.playerMesh.scaling.y = 1;
+    }
+    if (this.collider) {
+      this.collider.scaling.y = 1;
     }
 
     if (!this.isDead) {

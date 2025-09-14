@@ -215,7 +215,8 @@ class TempleRunGame {
       this.scene.getEngine(),
       this.scene,
       this.assetOptimizer,
-      this.config
+      this.config,
+      this.physics
     );
     this.gameLoop.registerSystem({
       update: () => this.performanceMonitor.update(),

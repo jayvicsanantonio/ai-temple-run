@@ -9,9 +9,10 @@
 
 // Read env from Vite (vite.config.js exposes BLENDER_* to import.meta.env)
 const env = typeof import.meta !== 'undefined' ? import.meta.env || {} : {};
-const envHost = env.BLENDER_HOST || env.VITE_BLENDER_HOST || '127.0.0.1';
+const envHost = env.BLENDER_HOST || env.VITE_BLENDER_HOST || 'localhost';
 const envPort = Number(env.BLENDER_PORT || env.VITE_BLENDER_PORT || 9876);
 const envBaseUrl = `http://${envHost}:${envPort}`;
+const isDev = !!(env && env.DEV);
 
 const defaultConfig = {
   debug: false,
@@ -19,7 +20,8 @@ const defaultConfig = {
   // Blender MCP server connectivity
   mcp: {
     enabled: true, // enabled per request; override via runtime if needed
-    baseUrl: envBaseUrl,
+    // In dev, prefer the Vite proxy at /mcp to avoid CORS
+    baseUrl: isDev ? '/mcp' : envBaseUrl,
     healthEndpoint: '/health',
     connectOnStart: true,
     requestTimeoutMs: 8000,

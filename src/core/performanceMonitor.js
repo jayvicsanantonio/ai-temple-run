@@ -9,10 +9,11 @@
 import { getConfig } from './config.js';
 
 export class PerformanceMonitor {
-  constructor(engine, scene, assetOptimizer, overrides = {}) {
+  constructor(engine, scene, assetOptimizer, overrides = {}, physics = null) {
     this.engine = engine;
     this.scene = scene;
     this.optimizer = assetOptimizer;
+    this.physics = physics;
     this.cfg = { ...getConfig(), ...overrides };
     this.perfCfg = this.cfg.performance || {
       targetFps: 60,
@@ -78,6 +79,15 @@ export class PerformanceMonitor {
     }
     if (scale !== this.optimizer.distanceScale) {
       this.optimizer.setDistanceScale(scale);
+    }
+
+    // Physics accuracy scaling
+    if (this.physics) {
+      let acc = 1.0;
+      if (fps > 0 && fps < lowerFps * 0.75) acc = 0.65;
+      else if (fps > 0 && fps < lowerFps) acc = 0.8;
+      else acc = 1.0;
+      this.physics.setAccuracyScale?.(acc);
     }
   }
 }
