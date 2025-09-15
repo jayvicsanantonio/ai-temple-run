@@ -168,13 +168,13 @@ export class CoinManager {
 
       if (coin) {
         coin.position.x = xPos;
-        coin.position.y = 0.8; // Float just above the path
+        coin.position.y = 0.4; // Just above the path surface
         coin.position.z = startZ + i * 2; // Space coins apart
 
         coin.coinData.active = true;
         coin.coinData.collected = false;
         coin.coinData.lane = lane;
-        coin.coinData.baseY = coin.position.y;
+        coin.coinData.baseY = 0.4; // Base height above path
         coin.coinData.bobPhase = Math.random() * Math.PI * 2;
 
         coin.setEnabled(true);
@@ -210,7 +210,7 @@ export class CoinManager {
       if (coin.isEnabled()) {
         const a = 0.12; // amplitude
         const w = 2.4;  // speed
-        const baseY = coin.coinData.baseY ?? 0.8;
+        const baseY = coin.coinData.baseY ?? 0.4;
         const phase = coin.coinData.bobPhase ?? 0;
         coin.position.y = baseY + Math.sin(this._time * w + phase) * a;
       }

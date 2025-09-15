@@ -72,19 +72,19 @@ export class MainScene {
    * Create the camera
    */
   createCamera() {
-    // Create a follow camera
+    // Create a follow camera with dramatic temple entrance view
     this.camera = new BABYLON.UniversalCamera(
       'gameCamera',
-      new BABYLON.Vector3(0, 6, -14),
+      new BABYLON.Vector3(0, 5, -12),
       this.scene
     );
-    
-    // Set camera target
-    this.camera.setTarget(new BABYLON.Vector3(0, 2.5, 7));
+
+    // Set camera target for better temple view
+    this.camera.setTarget(new BABYLON.Vector3(0, 2, 5));
     // Improve near-plane to prevent clipping with nearby meshes
     this.camera.minZ = 0.05;
     this.camera.maxZ = 2000;
-    this.camera.fov = 0.8; // ~45.8 degrees, keeps character fully in frame
+    this.camera.fov = 0.9; // Slightly wider field of view for temple grandeur
     
     // Attach camera to canvas
     this.camera.attachControl(this.canvas, false);

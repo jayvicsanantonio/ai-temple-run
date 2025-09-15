@@ -126,6 +126,15 @@ export class AssetManager {
       { path: 'temple_entrance_gate.glb', name: 'entranceGate' },
       { path: 'temple_fountain.glb', name: 'fountain' },
       { path: 'temple_vines.glb', name: 'vines' },
+
+      // New enhanced temple assets
+      { path: 'temple_new/ancient_temple_tile.glb', name: 'ancientTempleTile' },
+      { path: 'temple_new/temple_guardian_statue.glb', name: 'templeGuardian' },
+      { path: 'temple_new/ornate_temple_column.glb', name: 'ornateColumn' },
+      { path: 'temple_new/mystical_temple_crystal.glb', name: 'mysticalCrystal' },
+      { path: 'temple_new/ancient_temple_brazier.glb', name: 'templeBrazier' },
+      { path: 'temple_new/temple_stepping_stone.glb', name: 'steppingStone' },
+
       // Characters
       { path: 'characters/pikachu.glb', name: 'player' },
     ];
@@ -918,6 +927,36 @@ export class AssetManager {
     if (lower === 'templewall') return normalizeHeight(this.sizingTargets.templeWall_H);
     if (lower === 'bridgeplatform') return normalizeMax(this.sizingTargets.bridgePlatform);
     if (lower === 'tree') return normalizeHeight(this.sizingTargets.tree_H);
+
+    // New enhanced temple assets
+    if (lower === 'ancienttempletile') {
+      normalizeMax(3.0);
+      // Apply ancient stone material enhancements
+      for (const m of meshes) {
+        if (m.material) {
+          m.material.diffuseColor = new BABYLON.Color3(0.8, 0.7, 0.6);
+          m.material.specularColor = new BABYLON.Color3(0.2, 0.15, 0.1);
+        }
+      }
+      return;
+    }
+    if (lower === 'templeguardian') return normalizeHeight(4.0);
+    if (lower === 'ornatecolumn') return normalizeHeight(6.0);
+    if (lower === 'mysticalcrystal') {
+      normalizeMax(1.5);
+      // Add magical glow to crystals
+      for (const m of meshes) {
+        if (m.material) {
+          m.material.emissiveColor = new BABYLON.Color3(0.3, 0.6, 1.0);
+        }
+        if (this.glowLayer && this.glowLayer.addIncludedOnlyMesh) {
+          this.glowLayer.addIncludedOnlyMesh(m);
+        }
+      }
+      return;
+    }
+    if (lower === 'templebrazier') return normalizeMax(2.0);
+    if (lower === 'steppingstone') return normalizeMax(1.2);
     if (lower === 'mossstone') return normalizeMax(this.sizingTargets.mossStone);
     if (lower === 'carvedsymbol') return normalizeMax(this.sizingTargets.carvedSymbol);
     if (lower === 'vinearch') return normalizeHeight(this.sizingTargets.vineArch_H);
