@@ -95,12 +95,17 @@ export class AssetManager {
    */
   async loadGLBModels() {
     const modelAssets = [
-      // Pathway models
-      { path: 'pathways/ancient_stone_pathway_segment.glb', name: 'pathwaySegment' },
-      { path: 'pathways/curved_temple_path.glb', name: 'curvedPath' },
-      { path: 'pathways/temple_intersection.glb', name: 'pathIntersection' },
+      // Pathway models V2 - New high quality assets
+      { path: 'pathways_v2/path_straight_A_v001.glb', name: 'pathwaySegment' },
+      { path: 'pathways_v2/path_curve_30deg_v001.glb', name: 'curvedPath' },
+      { path: 'pathways_v2/path_incline_10deg_v001.glb', name: 'pathIncline' },
+      { path: 'pathways_v2/path_decline_10deg_v001.glb', name: 'pathDecline' },
+      { path: 'pathways_v2/wall_left_intact_v001.glb', name: 'wallLeft' },
+      { path: 'pathways_v2/wall_right_damaged_v001.glb', name: 'wallRight' },
+      { path: 'pathways_v2/wall_segment_broken_v001.glb', name: 'wallBroken' },
 
-      // Architecture models
+      // Architecture models V2 - Enhanced temple assets
+      { path: 'architecture_v2/temple_entrance_gate_v001.glb', name: 'templeEntranceGate' },
       { path: 'architecture/ornate_stone_pillar.glb', name: 'stonePillar' },
       { path: 'architecture/temple_wall_segment.glb', name: 'templeWall' },
       { path: 'architecture/stone_bridge_platform.glb', name: 'bridgePlatform' },
@@ -111,13 +116,24 @@ export class AssetManager {
       { path: 'obstacles/ancient_spike_trap.glb', name: 'spikeObstacle' },
 
       // Decoration models
-      { path: 'decorations/temple_tree_with_vines.glb', name: 'tree' },
+      { path: 'decorations/temple_tree_with_vines.glb', name: 'treeOld' },
       { path: 'decorations/moss_covered_stone.glb', name: 'mossStone' },
       { path: 'decorations/ancient_carved_symbol.glb', name: 'carvedSymbol' },
       { path: 'decorations/vine_wrapped_arch.glb', name: 'vineArch' },
       { path: 'decorations/totem_head.glb', name: 'totemHead' },
       { path: 'decorations/broken_obelisk.glb', name: 'brokenObelisk' },
       { path: 'decorations/serpent_idol.glb', name: 'serpentIdol' },
+      
+      // Environment V2 - High quality jungle assets
+      { path: 'environment_v2/tree_variant_A_v001.glb', name: 'treeA' },
+      { path: 'environment_v2/tree_variant_B_v001.glb', name: 'treeB' },
+      { path: 'environment_v2/tree_variant_C_v001.glb', name: 'treeC' },
+      { path: 'environment_v2/jungle_vines_v001.glb', name: 'jungleVines' },
+      
+      // Props V2 - Gameplay items
+      { path: 'props_v2/temple_coin_v002.glb', name: 'coinV2' },
+      { path: 'props_v2/torch_complete_v001.glb', name: 'torch' },
+      { path: 'props_v2/debris_pile_v001.glb', name: 'debrisPile' },
 
       // Additional temple assets
       { path: 'temple_coin_collectible.glb', name: 'coin' },
@@ -135,8 +151,10 @@ export class AssetManager {
       { path: 'temple_new/ancient_temple_brazier.glb', name: 'templeBrazier' },
       { path: 'temple_new/temple_stepping_stone.glb', name: 'steppingStone' },
 
-      // Characters
-      { path: 'characters/pikachu.glb', name: 'player' },
+      // Characters V2 - Temple runner character
+      { path: 'characters_v2/temple_runner_character_v001.glb', name: 'player' },
+      // Fallback to Pikachu if new character fails
+      { path: 'characters/pikachu.glb', name: 'playerFallback' },
     ];
 
     const loadPromises = modelAssets.map(async (asset) => {

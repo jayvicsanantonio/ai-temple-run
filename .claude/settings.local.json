@@ -24,7 +24,8 @@
       "mcp__playwright__browser_press_key",
       "mcp__playwright__browser_close",
       "mcp__blender__get_scene_info",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "mcp__blender__get_viewport_screenshot"
     ],
     "deny": [],
     "ask": []
