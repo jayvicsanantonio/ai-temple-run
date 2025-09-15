@@ -23,7 +23,8 @@ export class CoinManager {
     this.lanes = [-2, 0, 2];
 
     // Visual properties
-    this.coinRotationSpeed = 2;
+    this.coinRotationSpeed = 0; // spinning disabled; use gentle bobbing instead
+    this._time = 0;
   }
 
   /**
@@ -45,24 +46,64 @@ export class CoinManager {
       let coin;
 
       if (coinModel) {
-        // Use temple coin GLB model with LOD
-        coin =
-          this.assetManager.createLODInstance('coin', `coin_${i}`, new BABYLON.Vector3(0, 0, 0)) ||
-          coinModel.createInstance(`coin_${i}`);
+        console.log(`Creating coin instance ${i} from model:`, coinModel.name, coinModel.constructor.name);
 
-        // Apply golden material to temple coin
-        const goldMaterial = this.assetManager?.getMaterial('metal_plate');
-        if (goldMaterial) {
-          const applyToMeshOrSource = (m) => {
-            const target = m && m.sourceMesh ? m.sourceMesh : m;
-            if (target && target.material !== undefined) target.material = goldMaterial;
-          };
+        // Debug: log the structure
+        if (typeof coinModel.getChildMeshes === 'function') {
+          const meshes = coinModel.getChildMeshes(true); // Include descendants
+          console.log(`Coin model has ${meshes.length} child meshes:`, meshes.map(m => ({
+            name: m.name,
+            type: m.constructor.name,
+            vertices: m.getTotalVertices ? m.getTotalVertices() : 'N/A',
+            enabled: m.isEnabled(),
+            visible: m.isVisible
+          })));
+        }
+
+        // Try using the AssetManager's createLODInstance method which handles GLB properly
+        coin = this.assetManager.createLODInstance('coin', `coin_${i}`, new BABYLON.Vector3(0, 0, 0));
+
+        if (coin) {
+          coin.setEnabled(true);
+          console.log(`Coin ${i} created via LOD instance: SUCCESS`);
+          // Normalize coin size to fit lane scale
+          coin.scaling = new BABYLON.Vector3(0.6, 0.6, 0.6);
+          // Center coin instance so it's aligned to position
+          if (this.assetManager?.centerInstance) {
+            this.assetManager.centerInstance(coin);
+          }
+          // Make coin face camera around Y for readability
           if (typeof coin.getChildMeshes === 'function') {
-            for (const m of coin.getChildMeshes(false)) applyToMeshOrSource(m);
-          } else {
-            applyToMeshOrSource(coin);
+            for (const m of coin.getChildMeshes(false)) {
+              if (m && typeof m.billboardMode !== 'undefined') {
+                m.billboardMode = BABYLON.AbstractMesh.BILLBOARDMODE_Y;
+              }
+            }
+          }
+        } else {
+          // Fallback: try direct cloning of all child meshes
+          if (typeof coinModel.getChildMeshes === 'function') {
+            const meshes = coinModel.getChildMeshes(true);
+            if (meshes.length > 0) {
+              // Create a container for all the cloned meshes
+              coin = new BABYLON.TransformNode(`coin_${i}`, this.scene);
+
+              for (const mesh of meshes) {
+                if (mesh && mesh.getTotalVertices && mesh.getTotalVertices() > 0) {
+                  const clonedMesh = mesh.clone(`${coin.name}_${mesh.name}`);
+                  clonedMesh.parent = coin;
+                  clonedMesh.setEnabled(true);
+                  clonedMesh.isVisible = true;
+                }
+              }
+              console.log(`Coin ${i} created via mesh cloning: SUCCESS`);
+            }
           }
         }
+
+        console.log(`Coin ${i} final result:`, coin ? 'SUCCESS' : 'FAILED');
+
+        // Do not override emissive gold material set by AssetManager tuning
       } else {
         // Fallback to procedural coin
         coin = BABYLON.MeshBuilder.CreateCylinder(
@@ -82,6 +123,9 @@ export class CoinManager {
       }
 
       coin.setEnabled(false);
+      if (!coin.scaling) {
+        coin.scaling = new BABYLON.Vector3(0.6, 0.6, 0.6);
+      }
 
       // Store coin data
       coin.coinData = {
@@ -124,12 +168,14 @@ export class CoinManager {
 
       if (coin) {
         coin.position.x = xPos;
-        coin.position.y = 1; // Float above ground
+        coin.position.y = 0.8; // Float just above the path
         coin.position.z = startZ + i * 2; // Space coins apart
 
         coin.coinData.active = true;
         coin.coinData.collected = false;
         coin.coinData.lane = lane;
+        coin.coinData.baseY = coin.position.y;
+        coin.coinData.bobPhase = Math.random() * Math.PI * 2;
 
         coin.setEnabled(true);
         this.coins.push(coin);
@@ -148,6 +194,7 @@ export class CoinManager {
   updateCoins(deltaTime, playerPosition) {
     if (!playerPosition) return;
 
+    this._time += deltaTime;
     for (let i = this.coins.length - 1; i >= 0; i--) {
       const coin = this.coins[i];
       const dz = coin.position.z - playerPosition.z;
@@ -159,9 +206,13 @@ export class CoinManager {
         coin.setEnabled(true);
       }
 
-      // Rotate coin
+      // Gentle vertical bobbing for feedback (no spinning)
       if (coin.isEnabled()) {
-        coin.rotation.y += this.coinRotationSpeed * deltaTime;
+        const a = 0.12; // amplitude
+        const w = 2.4;  // speed
+        const baseY = coin.coinData.baseY ?? 0.8;
+        const phase = coin.coinData.bobPhase ?? 0;
+        coin.position.y = baseY + Math.sin(this._time * w + phase) * a;
       }
 
       // Check if coin is far behind the player
@@ -218,25 +269,129 @@ export class CoinManager {
    * @param {BABYLON.Mesh} coin - The collected coin
    */
   playCollectionAnimation(coin) {
-    // Simple scale and fade animation
-    const animationScale = new BABYLON.Animation(
-      'coinCollect',
+    // Enhanced collection animation with upward movement and golden particle burst
+    const animationGroup = new BABYLON.AnimationGroup("coinCollection", this.scene);
+
+    // Scale animation - more dramatic
+    const scaleAnimation = new BABYLON.Animation(
+      'coinScale',
       'scaling',
-      30,
+      60,
       BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
       BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
     );
 
-    const keys = [
+    const scaleKeys = [
       { frame: 0, value: coin.scaling.clone() },
-      { frame: 10, value: new BABYLON.Vector3(1.5, 1.5, 1.5) },
-      { frame: 20, value: new BABYLON.Vector3(0, 0, 0) },
+      { frame: 15, value: new BABYLON.Vector3(2.0, 2.0, 2.0) },
+      { frame: 30, value: new BABYLON.Vector3(0.1, 0.1, 0.1) },
     ];
+    scaleAnimation.setKeys(scaleKeys);
 
-    animationScale.setKeys(keys);
-    coin.animations.push(animationScale);
+    // Upward movement animation
+    const moveAnimation = new BABYLON.Animation(
+      'coinMove',
+      'position.y',
+      60,
+      BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+      BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+    );
 
-    this.scene.beginAnimation(coin, 0, 20, false);
+    const moveKeys = [
+      { frame: 0, value: coin.position.y },
+      { frame: 20, value: coin.position.y + 2.0 },
+      { frame: 30, value: coin.position.y + 1.5 },
+    ];
+    moveAnimation.setKeys(moveKeys);
+
+    // Spin animation for extra flair
+    const spinAnimation = new BABYLON.Animation(
+      'coinSpin',
+      'rotation.y',
+      60,
+      BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+      BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+    );
+
+    const spinKeys = [
+      { frame: 0, value: coin.rotation.y },
+      { frame: 30, value: coin.rotation.y + Math.PI * 4 },
+    ];
+    spinAnimation.setKeys(spinKeys);
+
+    // Add animations to group
+    animationGroup.addTargetedAnimation(scaleAnimation, coin);
+    animationGroup.addTargetedAnimation(moveAnimation, coin);
+    animationGroup.addTargetedAnimation(spinAnimation, coin);
+
+    // Create golden particle burst effect
+    this.createCoinParticles(coin.position);
+
+    // Play animation group
+    animationGroup.play(false);
+  }
+
+  /**
+   * Create golden particle burst effect for coin collection
+   * @param {BABYLON.Vector3} position - Position to create particles
+   */
+  createCoinParticles(position) {
+    // Create particle system for golden sparkles
+    const particleSystem = new BABYLON.ParticleSystem("coinParticles", 20, this.scene);
+
+    // Create simple golden sphere for particle texture
+    const particleTexture = new BABYLON.DynamicTexture("particleTexture", 64, this.scene);
+    const ctx = particleTexture.getContext();
+    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gradient.addColorStop(0, "rgba(255, 215, 0, 1)");
+    gradient.addColorStop(0.5, "rgba(255, 165, 0, 0.8)");
+    gradient.addColorStop(1, "rgba(255, 215, 0, 0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 64, 64);
+    particleTexture.update(false);
+
+    particleSystem.particleTexture = particleTexture;
+
+    // Particle emission properties
+    particleSystem.emitter = position.clone();
+    particleSystem.minEmitBox = new BABYLON.Vector3(-0.2, -0.2, -0.2);
+    particleSystem.maxEmitBox = new BABYLON.Vector3(0.2, 0.2, 0.2);
+
+    // Particle behavior
+    particleSystem.color1 = new BABYLON.Color4(1, 0.84, 0, 1);
+    particleSystem.color2 = new BABYLON.Color4(1, 0.65, 0, 1);
+    particleSystem.colorDead = new BABYLON.Color4(1, 1, 0, 0);
+
+    particleSystem.minSize = 0.1;
+    particleSystem.maxSize = 0.3;
+    particleSystem.minLifeTime = 0.3;
+    particleSystem.maxLifeTime = 0.8;
+
+    // Emission properties
+    particleSystem.emitRate = 50;
+    particleSystem.blendMode = BABYLON.ParticleSystem.BLENDMODE_ADD;
+
+    // Gravity and direction
+    particleSystem.gravity = new BABYLON.Vector3(0, -2, 0);
+    particleSystem.direction1 = new BABYLON.Vector3(-1, 1, -1);
+    particleSystem.direction2 = new BABYLON.Vector3(1, 2, 1);
+
+    particleSystem.minAngularSpeed = 0;
+    particleSystem.maxAngularSpeed = Math.PI;
+
+    particleSystem.minInitialRotation = 0;
+    particleSystem.maxInitialRotation = Math.PI;
+
+    // Start particles and auto-dispose
+    particleSystem.start();
+
+    setTimeout(() => {
+      particleSystem.stop();
+      setTimeout(() => {
+        particleSystem.dispose();
+        particleTexture.dispose();
+      }, 1000);
+    }, 200);
   }
 
   /**
@@ -261,7 +416,7 @@ export class CoinManager {
     coin.coinData.active = false;
     coin.coinData.collected = false;
     coin.coinData.lane = null;
-    coin.scaling = new BABYLON.Vector3(1, 1, 1);
+    // keep scaling as normalized when created
 
     // Remove from LOD tracking
     if (this.assetManager) {

@@ -72,6 +72,18 @@ export class InputHandler {
           event.preventDefault();
           if (this.callbacks.onToggleColliders) this.callbacks.onToggleColliders();
           break;
+
+        case 'f7':
+          // Toggle scene debugging
+          event.preventDefault();
+          if (this.callbacks.onToggleSceneDebug) this.callbacks.onToggleSceneDebug();
+          break;
+
+        case 'f8':
+          // Force all meshes visible
+          event.preventDefault();
+          if (this.callbacks.onForceVisibility) this.callbacks.onForceVisibility();
+          break;
       }
     });
   }
@@ -196,6 +208,20 @@ export class InputHandler {
    */
   setOnToggleColliders(callback) {
     this.callbacks.onToggleColliders = callback;
+  }
+
+  /**
+   * Set callback to toggle scene debugging
+   */
+  setOnToggleSceneDebug(callback) {
+    this.callbacks.onToggleSceneDebug = callback;
+  }
+
+  /**
+   * Set callback to force all meshes visible
+   */
+  setOnForceVisibility(callback) {
+    this.callbacks.onForceVisibility = callback;
   }
 
   /**

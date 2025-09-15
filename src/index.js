@@ -18,6 +18,8 @@ import { PerformanceTest } from './utils/performanceTest.js';
 import { DebugVisualization } from './utils/debugVisualization.js';
 import { AssetValidator } from './utils/assetValidator.js';
 import { ParticleEffects } from './core/particleEffects.js';
+import { SceneDebugger } from './utils/sceneDebugger.js';
+import { RenderingDebugger } from './utils/renderingDebugger.js';
 
 // Import styles
 import '../style.css';
@@ -41,6 +43,8 @@ class TempleRunGame {
     this.assetValidator = null;
     this.debugMode = false;
     this.particleEffects = null;
+    this.sceneDebugger = null;
+    this.renderingDebugger = null;
     this._wasJumping = false;
     this._wasSliding = false;
 
@@ -102,6 +106,28 @@ class TempleRunGame {
       this.canvas.id = 'renderCanvas';
       document.body.appendChild(this.canvas);
     }
+
+    // Set canvas size to match viewport
+    this.resizeCanvas();
+
+    // Handle window resize
+    window.addEventListener('resize', () => this.resizeCanvas());
+  }
+
+  /**
+   * Resize canvas to match viewport dimensions
+   */
+  resizeCanvas() {
+    if (!this.canvas) return;
+
+    const rect = this.canvas.getBoundingClientRect();
+    this.canvas.width = rect.width;
+    this.canvas.height = rect.height;
+
+    // Resize Babylon.js engine if it exists
+    if (this.mainScene && this.mainScene.engine) {
+      this.mainScene.engine.resize();
+    }
   }
 
   /**
@@ -122,7 +148,39 @@ class TempleRunGame {
 
     // Initialize player controller with improved model
     this.playerController = new PlayerController(this.scene);
-    const playerMesh = this.assetManager.getAsset('player') || this.createPlayerPlaceholder();
+    let playerMesh = this.assetManager.getModel('player');
+    if (playerMesh) {
+      // Center and normalize player size (~1.6m height) then add shadows
+      if (this.assetManager.centerInstance) {
+        this.assetManager.centerInstance(playerMesh);
+      }
+      try {
+        // Compute approximate height from child meshes
+        const meshes = typeof playerMesh.getChildMeshes === 'function' ? playerMesh.getChildMeshes(false) : [];
+        let minY = Infinity, maxY = -Infinity;
+        for (const m of meshes) {
+          if (!m.getBoundingInfo) continue;
+          m.computeWorldMatrix(true);
+          const bb = m.getBoundingInfo().boundingBox;
+          minY = Math.min(minY, bb.minimumWorld.y);
+          maxY = Math.max(maxY, bb.maximumWorld.y);
+        }
+        const height = isFinite(minY) && isFinite(maxY) ? (maxY - minY) : 1.6;
+        const target = 1.6;
+        if (height > 0.001) {
+          const s = target / height;
+          playerMesh.scaling = new BABYLON.Vector3(s, s, s);
+        }
+      } catch (e) {
+        // best effort scaling; ignore errors
+      }
+      if (this.mainScene.shadowGenerator) {
+        const casterMeshes = typeof playerMesh.getChildMeshes === 'function' ? playerMesh.getChildMeshes(false) : [];
+        casterMeshes.forEach((m) => this.mainScene.shadowGenerator.addShadowCaster(m));
+      }
+    } else {
+      playerMesh = this.createPlayerPlaceholder();
+    }
     this.playerController.init(playerMesh);
 
     // Check for debug mode and initialize collider debug state
@@ -188,6 +246,22 @@ class TempleRunGame {
       setTimeout(() => this.validateAssets(), 2000);
     }
 
+    // Initialize scene debugger for visibility debugging
+    this.sceneDebugger = new SceneDebugger(this.scene);
+
+    // Initialize rendering debugger for pipeline issues
+    this.renderingDebugger = new RenderingDebugger(this.scene, this.mainScene.engine);
+
+    if (this.debugMode) {
+      // Start comprehensive debugging for rendering pipeline issues
+      console.log('🔍 Starting comprehensive debugging for rendering issues...');
+      setTimeout(() => {
+        this.sceneDebugger.startDebugging();
+        this.sceneDebugger.createTestObjects();
+        this.renderingDebugger.startDebugging();
+      }, 3000);
+    }
+
     // Register systems with game loop
     this.gameLoop.registerSystem(this.playerController);
     this.gameLoop.registerSystem(this.worldManager);
@@ -228,6 +302,8 @@ class TempleRunGame {
     this.inputHandler.setOnSlide(() => this.playerController.slide());
     this.inputHandler.setOnPause(() => this.togglePause());
     this.inputHandler.setOnToggleColliders(() => this.toggleColliders());
+    this.inputHandler.setOnToggleSceneDebug(() => this.toggleSceneDebugging());
+    this.inputHandler.setOnForceVisibility(() => this.forceAllMeshesVisible());
 
     // Add debug visualization and validation toggles
     window.addEventListener('keydown', (e) => {
@@ -334,9 +410,13 @@ class TempleRunGame {
       this.debugMode ? this.gameOverEnhanced() : this.gameOver();
     }
 
-    // Update camera to follow player
+    // Update camera to smart-follow the player mesh (keeps full body in frame)
     if (this.playerController.player) {
-      this.mainScene.updateCameraFollow(this.playerController.player.position);
+      if (this.mainScene.updateCameraFollowForMesh) {
+        this.mainScene.updateCameraFollowForMesh(this.playerController.player);
+      } else {
+        this.mainScene.updateCameraFollow(this.playerController.player.position);
+      }
     }
 
     // Gradually increase game speed
@@ -455,6 +535,45 @@ class TempleRunGame {
       const health = this.assetManager.getAssetHealth();
       console.log(`🎨 Current Asset Health: ${health.status} - ${health.loadedAssets}/${health.totalAssets} loaded`);
     }
+  }
+
+  /**
+   * Toggle scene debugging for asset visibility investigation
+   */
+  toggleSceneDebugging() {
+    if (!this.sceneDebugger) {
+      console.log('🔍 Scene debugger not available');
+      return;
+    }
+
+    if (this.sceneDebugger.debugEnabled) {
+      this.sceneDebugger.stopDebugging();
+      console.log('🔍 Scene debugging STOPPED');
+    } else {
+      this.sceneDebugger.startDebugging();
+      console.log('🔍 Scene debugging STARTED - Press F7 to toggle, F8 to force visibility');
+    }
+  }
+
+  /**
+   * Force all meshes in the scene to be visible - debugging visibility issues
+   */
+  forceAllMeshesVisible() {
+    if (!this.sceneDebugger) {
+      console.log('🔍 Scene debugger not available');
+      return;
+    }
+
+    console.log('🔍 Forcing all meshes visible...');
+    this.sceneDebugger.forceVisibilityTest();
+
+    // Also create test objects to verify rendering pipeline
+    const testObjects = this.sceneDebugger.createTestObjects();
+    console.log('🔍 Created test objects:', testObjects);
+
+    // Get scene statistics
+    const stats = this.sceneDebugger.getSceneStats();
+    console.log('🔍 Scene Statistics:', stats);
   }
 
   /**

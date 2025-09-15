@@ -17,7 +17,12 @@
       "mcp__playwright__browser_console_messages",
       "Bash(cat:*)",
       "Bash(node:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_network_requests",
+      "mcp__playwright__browser_press_key",
+      "mcp__playwright__browser_close"
     ],
     "deny": [],
     "ask": []

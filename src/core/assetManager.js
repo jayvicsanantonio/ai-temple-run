@@ -16,6 +16,8 @@ export class AssetManager {
     this.isLoading = false;
     this.assetBasePath = '/assets/';
     this.performanceMonitor = performanceMonitor;
+    // Access optional glow layer created by the main scene
+    this.glowLayer = scene?.glowLayer || null;
     this.modelPaths = {
       pathways: 'models/pathways/',
       architecture: 'models/architecture/',
@@ -32,6 +34,29 @@ export class AssetManager {
     this.lodEnabled = false;
     this.lodInstances = new Map();
     this.lodDistances = { high: 20, medium: 40, low: 60 };
+
+    // Visual tuning targets (approximate world-space sizes)
+    // Values are largest dimension (or height for *_H keys)
+    this.sizingTargets = {
+      coin: 0.8,
+      logObstacle: 3.0,
+      rockObstacle: 1.4,
+      spikeObstacle: 1.8,
+      stonePillar_H: 4.0,
+      templeWall_H: 1.5,
+      bridgePlatform: 6.0,
+      tree_H: 6.0,
+      mossStone: 1.4,
+      carvedSymbol: 1.6,
+      vineArch_H: 5.0,
+      totemHead: 2.2,
+      brokenObelisk_H: 4.0,
+      serpentIdol_H: 3.0,
+      fountain_H: 3.0,
+      crystalFormation_H: 3.0,
+      templeComplex: 10.0,
+      player_H: 1.6,
+    };
   }
 
   /**
@@ -101,6 +126,8 @@ export class AssetManager {
       { path: 'temple_entrance_gate.glb', name: 'entranceGate' },
       { path: 'temple_fountain.glb', name: 'fountain' },
       { path: 'temple_vines.glb', name: 'vines' },
+      // Characters
+      { path: 'characters/pikachu.glb', name: 'player' },
     ];
 
     const loadPromises = modelAssets.map(async (asset) => {
@@ -208,17 +235,26 @@ export class AssetManager {
    * Create procedural assets (fallbacks for when GLB models fail to load)
    */
   async createProceduralAssets() {
-    // Create player character
-    this.createPlayerCharacter();
+    // Create player character only if a GLB wasn't loaded
+    if (!this.assets.player) {
+      this.createPlayerCharacter();
+    }
 
-    // Create obstacle variations
-    this.createObstacles();
+    // Create obstacle variations only if any are missing
+    if (!this.assets.logObstacle || !this.assets.rockObstacle || !this.assets.spikeObstacle) {
+      this.createObstacles();
+    }
 
-    // Create coin model
-    this.createCoin();
+    // Create coin model only if GLB wasn't loaded
+    if (!this.assets.coin) {
+      this.createCoin();
+    }
 
-    // Create environment decorations
-    this.createDecorations();
+    // Create environment decorations (purely procedural fallbacks)
+    // Only if not present from GLB imports
+    if (!this.assets.pillar || !this.assets.tree) {
+      this.createDecorations();
+    }
   }
 
   /**
@@ -614,6 +650,40 @@ export class AssetManager {
   }
 
   /**
+   * Force compile all materials to make them ready for rendering
+   */
+  async compileMaterials() {
+    console.log('Compiling materials for rendering...');
+
+    const materials = this.scene.materials;
+    let readyCount = 0;
+
+    // Simple approach: just wait for scene to be ready and force a render
+    return new Promise((resolve) => {
+      const checkSceneReady = () => {
+        // Force a render cycle to compile shaders
+        if (this.scene.getEngine()) {
+          this.scene.getEngine().runRenderLoop(() => {
+            this.scene.render();
+          });
+
+          // Stop after one render cycle
+          setTimeout(() => {
+            this.scene.getEngine().stopRenderLoop();
+            readyCount = materials.filter(m => m.isReady()).length;
+            console.log(`Materials compilation complete: ${readyCount}/${materials.length} ready`);
+            resolve();
+          }, 100);
+        } else {
+          setTimeout(checkSceneReady, 50);
+        }
+      };
+
+      checkSceneReady();
+    });
+  }
+
+  /**
    * Create fallback procedural materials
    */
   createFallbackMaterials() {
@@ -758,6 +828,25 @@ export class AssetManager {
       instance.position.copyFrom(position);
     }
 
+    // Ensure proper visibility for instances (no auto-scaling here)
+    if (instance) {
+      instance.setEnabled(true);
+      if (typeof instance.getChildMeshes === 'function') {
+        const childMeshes = instance.getChildMeshes(true);
+        for (const mesh of childMeshes) {
+          if (!mesh) continue;
+          mesh.setEnabled(true);
+          mesh.isVisible = true;
+        }
+      }
+
+      // Apply per-asset visual tuning and clamp extreme sizes
+      try {
+        this.applyAssetTuning(modelName, instance);
+        this._clampInstanceScale(instance, 18);
+      } catch (_) {}
+    }
+
     // Register for LOD management (track the returned top-level node)
     if (instance && this.lodEnabled) {
       if (!this.lodInstances) this.lodInstances = new Map();
@@ -774,6 +863,144 @@ export class AssetManager {
     }
 
     return instance;
+  }
+
+  /**
+   * Apply per-asset look-and-feel: scale normalization and special materials
+   */
+  applyAssetTuning(name, instance) {
+    if (!name || !instance) return;
+
+    const lower = String(name).toLowerCase();
+    const meshes = typeof instance.getChildMeshes === 'function' ? instance.getChildMeshes(false) : [];
+
+    // Helper: set emissive gold and add glow
+    const setGoldGlow = (m) => {
+      if (!m) return;
+      if (!m.material) m.material = new BABYLON.StandardMaterial(`${name}_mat`, this.scene);
+      if (m.material && m.material.diffuseColor) {
+        m.material.diffuseColor = new BABYLON.Color3(1.0, 0.85, 0.2);
+        m.material.emissiveColor = new BABYLON.Color3(0.8, 0.6, 0.15);
+        m.material.specularColor = new BABYLON.Color3(1, 1, 1);
+      }
+      if (this.glowLayer && this.glowLayer.addIncludedOnlyMesh) {
+        this.glowLayer.addIncludedOnlyMesh(m);
+      }
+    };
+
+    // Scaling helpers
+    const normalizeMax = (target) => this._normalizeToMaxDim(instance, target);
+    const normalizeHeight = (target) => this._normalizeToHeight(instance, target);
+
+    // Coins
+    if (lower === 'coin') {
+      normalizeMax(this.sizingTargets.coin);
+      // Diamond look: tilt a bit
+      instance.rotation = instance.rotation || new BABYLON.Vector3(0, 0, 0);
+      instance.rotation.z = Math.PI * 0.25;
+      for (const m of meshes) setGoldGlow(m);
+      return;
+    }
+
+    // Player
+    if (lower === 'player') {
+      normalizeHeight(this.sizingTargets.player_H);
+      return;
+    }
+
+    // Obstacles
+    if (lower === 'logobstacle') return normalizeMax(this.sizingTargets.logObstacle);
+    if (lower === 'rockobstacle') return normalizeMax(this.sizingTargets.rockObstacle);
+    if (lower === 'spikeobstacle') return normalizeMax(this.sizingTargets.spikeObstacle);
+
+    // Architecture / decorations
+    if (lower === 'stonepillar') return normalizeHeight(this.sizingTargets.stonePillar_H);
+    if (lower === 'templewall') return normalizeHeight(this.sizingTargets.templeWall_H);
+    if (lower === 'bridgeplatform') return normalizeMax(this.sizingTargets.bridgePlatform);
+    if (lower === 'tree') return normalizeHeight(this.sizingTargets.tree_H);
+    if (lower === 'mossstone') return normalizeMax(this.sizingTargets.mossStone);
+    if (lower === 'carvedsymbol') return normalizeMax(this.sizingTargets.carvedSymbol);
+    if (lower === 'vinearch') return normalizeHeight(this.sizingTargets.vineArch_H);
+    if (lower === 'totemhead') return normalizeMax(this.sizingTargets.totemHead);
+    if (lower === 'brokenobelisk') return normalizeHeight(this.sizingTargets.brokenObelisk_H);
+    if (lower === 'serpentidol') return normalizeHeight(this.sizingTargets.serpentIdol_H);
+    if (lower === 'fountain') return normalizeHeight(this.sizingTargets.fountain_H);
+    if (lower === 'crystalformation') return normalizeHeight(this.sizingTargets.crystalFormation_H);
+    if (lower === 'templecomplex') return normalizeMax(this.sizingTargets.templeComplex);
+  }
+
+  /**
+   * Normalize to target largest dimension
+   */
+  _normalizeToMaxDim(node, target) {
+    const sz = this._getWorldSize(node);
+    if (!sz || !isFinite(sz) || sz < 1e-3) return;
+    const s = target / sz;
+    if (!node.scaling) node.scaling = new BABYLON.Vector3(1, 1, 1);
+    node.scaling = node.scaling.scale(s);
+  }
+
+  /**
+   * Normalize to target height (Y dimension)
+   */
+  _normalizeToHeight(node, targetH) {
+    const meshes = typeof node.getChildMeshes === 'function' ? node.getChildMeshes(false) : [];
+    if (!meshes || meshes.length === 0) return;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    for (const m of meshes) {
+      if (!m.getBoundingInfo) continue;
+      m.computeWorldMatrix(true);
+      const bb = m.getBoundingInfo().boundingBox;
+      minY = Math.min(minY, bb.minimumWorld.y);
+      maxY = Math.max(maxY, bb.maximumWorld.y);
+    }
+    const height = maxY - minY;
+    if (!height || !isFinite(height) || height < 1e-3) return;
+    const s = targetH / height;
+    if (!node.scaling) node.scaling = new BABYLON.Vector3(1, 1, 1);
+    node.scaling = node.scaling.scale(s);
+  }
+
+  /**
+   * Compute world-space bounding box size for a node
+   */
+  _getWorldSize(node) {
+    if (!node || typeof node.getChildMeshes !== 'function') return 0;
+    const meshes = node.getChildMeshes(false);
+    if (!meshes || meshes.length === 0) return 0;
+    let min = new BABYLON.Vector3(
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY
+    );
+    let max = new BABYLON.Vector3(
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY
+    );
+    for (const m of meshes) {
+      if (!m.getBoundingInfo) continue;
+      m.computeWorldMatrix(true);
+      const bb = m.getBoundingInfo().boundingBox;
+      min = BABYLON.Vector3.Minimize(min, bb.minimumWorld);
+      max = BABYLON.Vector3.Maximize(max, bb.maximumWorld);
+    }
+    const size = max.subtract(min);
+    return Math.max(size.x, size.y, size.z);
+  }
+
+  /**
+   * Clamp the instance scale so its largest dimension <= maxDim
+   */
+  _clampInstanceScale(instance, maxDim) {
+    const size = this._getWorldSize(instance);
+    if (!size || !isFinite(size) || size <= 0) return;
+    if (size > maxDim) {
+      const s = maxDim / size;
+      if (!instance.scaling) instance.scaling = new BABYLON.Vector3(1, 1, 1);
+      instance.scaling = instance.scaling.scale(s);
+    }
   }
 
   /**
@@ -1073,9 +1300,25 @@ export class AssetManager {
             rn.setParent(root);
           }
 
-          // Disable all meshes in this model so only instances are visible
+          // Keep base meshes enabled so they are visible in the scene
           for (const m of container.meshes) {
-            if (m && m.setEnabled) m.setEnabled(false);
+            if (m && m.setEnabled) {
+              m.setEnabled(true);
+              m.isVisible = true;
+
+              // Ensure materials are properly set and visible (do not auto-scale)
+              if (m.material) {
+                if (m.material.alpha !== undefined && m.material.alpha < 0.1) {
+                  m.material.alpha = 1.0;
+                }
+              } else {
+                // Add a default material if none exists
+                const defaultMat = new BABYLON.StandardMaterial(`${name}_default`, this.scene);
+                defaultMat.diffuseColor = new BABYLON.Color3(0.7, 0.6, 0.5);
+                defaultMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+                m.material = defaultMat;
+              }
+            }
           }
 
           // Store in assets
@@ -1109,5 +1352,36 @@ export class AssetManager {
     } catch (error) {
       console.error('Error loading external assets:', error);
     }
+  }
+
+  /**
+   * Get asset health information for debugging
+   */
+  getAssetHealth() {
+    const totalAssets = Object.keys(this.assets).length;
+    const loadedAssets = Object.values(this.assets).filter(asset => asset !== null).length;
+    const healthPercentage = totalAssets > 0 ? (loadedAssets / totalAssets) * 100 : 0;
+
+    let status = 'unknown';
+    if (healthPercentage === 100) {
+      status = 'excellent';
+    } else if (healthPercentage >= 80) {
+      status = 'good';
+    } else if (healthPercentage >= 60) {
+      status = 'fair';
+    } else if (healthPercentage >= 40) {
+      status = 'poor';
+    } else {
+      status = 'critical';
+    }
+
+    return {
+      status,
+      totalAssets,
+      loadedAssets,
+      healthPercentage,
+      isLoading: this.isLoading,
+      loadingProgress: this.loadingProgress
+    };
   }
 }

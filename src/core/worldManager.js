@@ -65,27 +65,27 @@ export class WorldManager {
    * Create different materials for tiles
    */
   createTileMaterials() {
-    // Main path material
-    const pathMaterial = new BABYLON.StandardMaterial('pathMat', this.scene);
-    pathMaterial.diffuseTexture = new BABYLON.Texture(
-      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-      this.scene
-    );
-    pathMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.25, 0.2);
-    pathMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
-    this.tileMaterials.push(pathMaterial);
+    // Use AssetManager materials instead of creating new ones
+    this.tileMaterials = [];
 
-    // Alternative path material
-    const altPathMaterial = new BABYLON.StandardMaterial('altPathMat', this.scene);
-    altPathMaterial.diffuseColor = new BABYLON.Color3(0.35, 0.3, 0.25);
-    altPathMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
-    this.tileMaterials.push(altPathMaterial);
+    // Stone path materials
+    const stoneMat = this.assetManager?.getMaterial('castle_wall_slates') || this.createFallbackMaterial('stone', new BABYLON.Color3(0.4, 0.35, 0.3));
+    this.tileMaterials.push(stoneMat);
 
-    // Grass/side material
-    const grassMaterial = new BABYLON.StandardMaterial('grassMat', this.scene);
-    grassMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.4, 0.15);
-    grassMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
-    this.tileMaterials.push(grassMaterial);
+    // Bark/wood materials for organic elements
+    const barkMat = this.assetManager?.getMaterial('bark_brown') || this.createFallbackMaterial('bark', new BABYLON.Color3(0.3, 0.2, 0.1));
+    this.tileMaterials.push(barkMat);
+
+    // Metal materials for architectural elements
+    const metalMat = this.assetManager?.getMaterial('metal_plate') || this.createFallbackMaterial('metal', new BABYLON.Color3(0.5, 0.5, 0.4));
+    this.tileMaterials.push(metalMat);
+  }
+
+  createFallbackMaterial(name, color) {
+    const material = new BABYLON.StandardMaterial(`${name}Mat`, this.scene);
+    material.diffuseColor = color;
+    material.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+    return material;
   }
 
   /**
@@ -120,6 +120,9 @@ export class WorldManager {
     basePath.parent = tileContainer;
     const baseMat = this.assetManager?.getMaterial('castle_wall_slates') || this.tileMaterials[0];
     if (baseMat) basePath.material = baseMat;
+
+    // Add low stone rails along the path edges (Temple Run vibe)
+    this.addPathRails(tileContainer, name);
 
     // Choose tile type for variety
     const tileType = this.tileTypes[Math.floor(Math.random() * this.tileTypes.length)];
@@ -188,6 +191,31 @@ export class WorldManager {
     };
 
     return tileContainer;
+  }
+
+  /**
+   * Add low guard rails/parapets along the path edges so the lane feels defined
+   */
+  addPathRails(container, name) {
+    const railDepth = this.tileLength * 0.95;
+    const railWidth = 0.5;
+    const railHeight = 0.8;
+    const x = this.tileWidth * 0.5 - railWidth * 0.5; // near the path edges
+    const mat = this.assetManager?.getMaterial('castle_wall_slates') || this.tileMaterials?.[0];
+
+    const left = BABYLON.MeshBuilder.CreateBox(`${name}_railL`, { width: railWidth, height: railHeight, depth: railDepth }, this.scene);
+    left.position.set(-x, railHeight * 0.5 - 0.1, 0);
+    left.parent = container;
+    left.checkCollisions = false;
+    left.receiveShadows = true;
+    if (mat) left.material = mat;
+
+    const right = BABYLON.MeshBuilder.CreateBox(`${name}_railR`, { width: railWidth, height: railHeight, depth: railDepth }, this.scene);
+    right.position.set(x, railHeight * 0.5 - 0.1, 0);
+    right.parent = container;
+    right.checkCollisions = false;
+    right.receiveShadows = true;
+    if (mat) right.material = mat;
   }
 
   /**
@@ -270,6 +298,26 @@ export class WorldManager {
       tile.setEnabled(true);
       tile.tileData.active = true;
       tile.tileData.isSwamp = isSwamp;
+
+      // Keep the first stretch visually clear: disable bulky side architecture
+      if (zPosition < 100) {
+        try {
+          const kids = tile.getChildren ? tile.getChildren() : [];
+          for (const n of kids) {
+            const nm = (n.name || '').toLowerCase();
+            if (
+              nm.includes('_leftwall') ||
+              nm.includes('_rightwall') ||
+              nm.includes('_pillar') ||
+              nm.includes('_bg_') ||
+              nm.includes('_atmo_') ||
+              nm.includes('vinearch')
+            ) {
+              if (n.setEnabled) n.setEnabled(false);
+            }
+          }
+        } catch (_) {}
+      }
 
       // Apply biome styling
       if (isSwamp) {
@@ -380,16 +428,108 @@ export class WorldManager {
    * Add temple architecture elements to a tile
    */
   addTempleArchitecture(tileContainer, name) {
-    // Disabled pillars/walls to keep the road clear
-    return;
+    // Create rich temple environment with walls, pillars, and architectural elements
+    // Push side elements further away to keep the center lane clearly visible
+    const sideDistance = 12; // Distance from center path to place architecture
+    const decorationDistance = 12; // Distance for decorative elements
+
+    // Add temple walls along the sides
+    this.addTempleWalls(tileContainer, name, sideDistance);
+
+    // Add stone pillars at strategic positions
+    this.addStonePillars(tileContainer, name, sideDistance);
+
+    // Add temple decorations in the background
+    this.addBackgroundDecorations(tileContainer, name, decorationDistance);
+
+    // Add atmospheric elements (vines, moss stones)
+    this.addAtmosphericElements(tileContainer, name);
+  }
+
+  addTempleWalls(tileContainer, name, distance) {
+    const wallModel = this.assetManager?.getModel('templeWall');
+    if (!wallModel) return;
+
+    // Left wall
+    const leftWall = this.assetManager.createLODInstance('templeWall', `${name}_leftWall`, new BABYLON.Vector3(-distance, 0, 0));
+    if (leftWall) {
+      leftWall.parent = tileContainer;
+      leftWall.scaling = new BABYLON.Vector3(1, 2, 1); // Make walls taller
+      leftWall.rotation.y = Math.PI / 2; // Face inward
+    }
+
+    // Right wall
+    const rightWall = this.assetManager.createLODInstance('templeWall', `${name}_rightWall`, new BABYLON.Vector3(distance, 0, 0));
+    if (rightWall) {
+      rightWall.parent = tileContainer;
+      rightWall.scaling = new BABYLON.Vector3(1, 2, 1); // Make walls taller
+      rightWall.rotation.y = -Math.PI / 2; // Face inward
+    }
+  }
+
+  addStonePillars(tileContainer, name, distance) {
+    const pillarModel = this.assetManager?.getModel('stonePillar');
+    if (!pillarModel) return;
+
+    // Add pillars at random positions along the sides
+    if (Math.random() < 0.3) {
+      const pillar = this.assetManager.createLODInstance('stonePillar', `${name}_pillar`,
+        new BABYLON.Vector3((Math.random() < 0.5 ? -1 : 1) * distance, 0, Math.random() * this.tileLength - this.tileLength/2));
+      if (pillar) {
+        pillar.parent = tileContainer;
+        pillar.scaling = new BABYLON.Vector3(1.5, 2.5, 1.5); // Impressive scale
+      }
+    }
+  }
+
+  addBackgroundDecorations(tileContainer, name, distance) {
+    const decorationModels = ['templeComplex', 'entranceGate', 'fountain', 'crystalFormation', 'brokenObelisk'];
+
+    // Add random background elements
+    if (Math.random() < 0.4) {
+      const modelName = decorationModels[Math.floor(Math.random() * decorationModels.length)];
+      const decoration = this.assetManager.createLODInstance(modelName, `${name}_bg_${modelName}`,
+        new BABYLON.Vector3((Math.random() < 0.5 ? -1 : 1) * distance, 0, Math.random() * this.tileLength - this.tileLength/2));
+      if (decoration) {
+        decoration.parent = tileContainer;
+        decoration.scaling = new BABYLON.Vector3(1.2, 1.2, 1.2);
+      }
+    }
+  }
+
+  addAtmosphericElements(tileContainer, name) {
+    // Add vines, moss, and organic elements
+    const atmosphericModels = ['vines', 'mossStone', 'tree', 'vineArch'];
+
+    for (let i = 0; i < 2; i++) {
+      if (Math.random() < 0.5) {
+        const modelName = atmosphericModels[Math.floor(Math.random() * atmosphericModels.length)];
+        // Keep a clear corridor around the center path to avoid blocking the camera/player view
+        const clearHalfWidth = this.tileWidth * 0.5 + 1.5; // lanes (±3) + margin
+        const sideOffset = clearHalfWidth + 2 + Math.random() * 6; // place further out
+        const x = Math.random() < 0.5 ? -sideOffset : sideOffset;
+        const z = Math.random() * this.tileLength - this.tileLength / 2;
+        const element = this.assetManager.createLODInstance(
+          modelName,
+          `${name}_atmo_${modelName}_${i}`,
+          new BABYLON.Vector3(x, 0, z)
+        );
+        if (element) {
+          element.parent = tileContainer;
+          element.scaling = new BABYLON.Vector3(0.8, 0.8, 0.8);
+        }
+      }
+    }
   }
 
   /**
    * Add temple decorative elements to a tile
    */
   addDecorations(tile, zPosition) {
+    // Keep early gameplay visually clear
+    if (zPosition < 100) return;
     // Random chance to add temple decorations
-    if (Math.random() < 0.4) {
+    if (Math.random() < 0.55) {
       const isSwamp = !!tile?.tileData?.isSwamp;
       const decorationModels = isSwamp
         ? [
@@ -420,14 +560,18 @@ export class WorldManager {
             'brokenObelisk',
             'serpentIdol',
           ];
-      const randomDecoration =
-        decorationModels[Math.floor(Math.random() * decorationModels.length)];
+      // Avoid center-arch in the very first stretch so the opening view stays clear
+      const models = (zPosition < this.tileLength * 2)
+        ? decorationModels.filter((m) => m !== 'vineArch')
+        : decorationModels;
+      const randomDecoration = models[Math.floor(Math.random() * models.length)];
       const decorationModel = this.assetManager?.getModel(randomDecoration);
 
       if (decorationModel) {
-        // Add temple decoration on one side with LOD
-        let decorationX = Math.random() > 0.5 ? -3.5 : 3.5;
-        const decorationZ = zPosition + (Math.random() * 10 - 5);
+        // Add temple decoration away from the center lane
+        const clearHalfWidth = this.tileWidth * 0.5 + 1.2;
+        let decorationX = (Math.random() < 0.5 ? -1 : 1) * (clearHalfWidth + 1 + Math.random() * 4);
+        let decorationZ = zPosition + (Math.random() * this.tileLength - this.tileLength / 2);
         const decorationPos = new BABYLON.Vector3(decorationX, 0, decorationZ);
 
         const decoration =
@@ -437,9 +581,10 @@ export class WorldManager {
             decorationPos
           ) || decorationModel.createInstance(`decoration_${zPosition}_${randomDecoration}`);
 
-        // Place arches in the center as gateway accents
+        // If using an arch, place it near the tile ends so it frames the path without blocking the camera
         if (randomDecoration === 'vineArch') {
           decorationX = 0;
+          decorationZ = zPosition + (Math.random() < 0.5 ? -this.tileLength * 0.45 : this.tileLength * 0.45);
         }
         decoration.position.x = decorationX;
         decoration.position.y = 0;
@@ -471,6 +616,39 @@ export class WorldManager {
         tile.tileData.decorations.push(decoration);
       }
     }
+
+    // Side scenery clusters to make world feel alive (beyond path corridor)
+    if (Math.random() < 0.4) {
+      const cluster = this.createSceneryCluster(zPosition);
+      if (cluster) tile.tileData.decorations.push(cluster);
+    }
+  }
+
+  /** Create a small cluster of scenery well outside the path corridor */
+  createSceneryCluster(zCenter) {
+    const container = new BABYLON.TransformNode(`cluster_${zCenter.toFixed(1)}`, this.scene);
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const baseX = side * (this.tileWidth * 0.5 + 8 + Math.random() * 6);
+    const baseZ = zCenter + (Math.random() * this.tileLength - this.tileLength / 2);
+
+    const candidates = ['tree', 'mossStone', 'brokenObelisk', 'serpentIdol', 'totemHead'];
+    const num = 1 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < num; i++) {
+      const name = candidates[Math.floor(Math.random() * candidates.length)];
+      const model = this.assetManager?.getModel(name);
+      if (!model) continue;
+      const p = new BABYLON.Vector3(
+        baseX + (Math.random() - 0.5) * 3,
+        0,
+        baseZ + (Math.random() - 0.5) * 4
+      );
+      const inst =
+        this.assetManager.createLODInstance(name, `${container.name}_${name}_${i}`, p) ||
+        model.createInstance(`${container.name}_${name}_${i}`);
+      inst.parent = container;
+    }
+
+    return container;
   }
 
   /**
@@ -492,6 +670,16 @@ export class WorldManager {
     // Update LOD system based on player position
     if (this.assetManager) {
       this.assetManager.updateLOD(playerPosition);
+    }
+
+    // Update obstacle manager to spawn obstacles
+    if (this.obstacleManager) {
+      this.obstacleManager.update(deltaTime, playerPosition);
+    }
+
+    // Update coin manager to spawn coins
+    if (this.coinManager) {
+      this.coinManager.update(deltaTime, playerPosition);
     }
 
     // Spawn new tiles ahead

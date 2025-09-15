@@ -52,19 +52,20 @@ export class MainScene {
    */
   createScene() {
     this.scene = new BABYLON.Scene(this.engine);
-    // Misty jungle atmosphere
-    this.scene.clearColor = new BABYLON.Color3(0.55, 0.68, 0.58);
-    
+    // Swamp temple atmosphere – teal haze with warm sunlight accents
+    this.scene.clearColor = new BABYLON.Color3(0.38, 0.58, 0.60);
+
     // Enable collisions
     this.scene.collisionsEnabled = true;
-    
+
     // Set gravity
     this.scene.gravity = new BABYLON.Vector3(0, -9.81, 0);
-    
-    // Enable fog for depth effect
-    this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP;
-    this.scene.fogDensity = 0.018;
-    this.scene.fogColor = new BABYLON.Color3(0.55, 0.68, 0.58);
+
+    // Atmospheric fog for depth – teal like in Temple Run refs
+    this.scene.fogMode = BABYLON.Scene.FOGMODE_LINEAR;
+    this.scene.fogStart = 30;
+    this.scene.fogEnd = 120;
+    this.scene.fogColor = new BABYLON.Color3(0.26, 0.44, 0.50);
   }
 
   /**
@@ -74,12 +75,16 @@ export class MainScene {
     // Create a follow camera
     this.camera = new BABYLON.UniversalCamera(
       'gameCamera',
-      new BABYLON.Vector3(0, 5, -10),
+      new BABYLON.Vector3(0, 6, -14),
       this.scene
     );
     
     // Set camera target
-    this.camera.setTarget(new BABYLON.Vector3(0, 2, 5));
+    this.camera.setTarget(new BABYLON.Vector3(0, 2.5, 7));
+    // Improve near-plane to prevent clipping with nearby meshes
+    this.camera.minZ = 0.05;
+    this.camera.maxZ = 2000;
+    this.camera.fov = 0.8; // ~45.8 degrees, keeps character fully in frame
     
     // Attach camera to canvas
     this.camera.attachControl(this.canvas, false);
@@ -92,35 +97,82 @@ export class MainScene {
    * Create lighting
    */
   createLighting() {
-    // Hemispheric light for ambient lighting
+    // Hemispheric light for ambient lighting - warmer temple atmosphere
     const hemiLight = new BABYLON.HemisphericLight(
       'hemiLight',
       new BABYLON.Vector3(0, 1, 0),
       this.scene
     );
-    hemiLight.intensity = 0.65;
-    // Slightly warm, green-tinged ambient for jungle
-    hemiLight.diffuse = new BABYLON.Color3(0.95, 0.98, 0.92);
-    hemiLight.specular = new BABYLON.Color3(0.1, 0.1, 0.1);
-    hemiLight.groundColor = new BABYLON.Color3(0.45, 0.55, 0.45);
+    hemiLight.intensity = 0.5;
+    // Warm golden ambient with slight green tint from foliage
+    hemiLight.diffuse = new BABYLON.Color3(0.95, 0.88, 0.70);
+    hemiLight.specular = new BABYLON.Color3(0.18, 0.15, 0.12);
+    hemiLight.groundColor = new BABYLON.Color3(0.45, 0.50, 0.45);
 
-    // Directional light for shadows
+    // Main directional light - simulating sunlight through temple openings
     this.light = new BABYLON.DirectionalLight(
-      'dirLight',
-      // Late-afternoon angle
-      new BABYLON.Vector3(-0.6, -1.5, 0.8),
+      'templeMainLight',
+      new BABYLON.Vector3(-0.5, -1.2, 0.7),
       this.scene
     );
-    this.light.intensity = 0.6;
-    this.light.position = new BABYLON.Vector3(30, 60, -15);
-    this.light.diffuse = new BABYLON.Color3(1.0, 0.94, 0.82);
-    this.light.specular = new BABYLON.Color3(1.0, 0.95, 0.85);
-    
-    // Setup shadows
-    const shadowGenerator = new BABYLON.ShadowGenerator(1024, this.light);
+    this.light.intensity = 0.9;
+    this.light.position = new BABYLON.Vector3(40, 80, -20);
+    this.light.diffuse = new BABYLON.Color3(1.0, 0.85, 0.6); // Warm golden sunlight
+    this.light.specular = new BABYLON.Color3(1.0, 0.9, 0.7);
+
+    // Secondary light for temple interior illumination
+    const templeInteriorLight = new BABYLON.DirectionalLight(
+      'templeInteriorLight',
+      new BABYLON.Vector3(0.3, -0.8, -0.5),
+      this.scene
+    );
+    templeInteriorLight.intensity = 0.3;
+    templeInteriorLight.position = new BABYLON.Vector3(-20, 40, 30);
+    templeInteriorLight.diffuse = new BABYLON.Color3(0.9, 0.7, 0.5); // Warm temple glow
+
+    // Atmospheric rim light for depth
+    const rimLight = new BABYLON.DirectionalLight(
+      'rimLight',
+      new BABYLON.Vector3(1, 0, 0.3),
+      this.scene
+    );
+    rimLight.intensity = 0.2;
+    rimLight.diffuse = new BABYLON.Color3(0.8, 0.6, 0.4);
+
+    // Enhanced shadows with higher resolution
+    const shadowGenerator = new BABYLON.ShadowGenerator(2048, this.light);
     shadowGenerator.useBlurExponentialShadowMap = true;
-    shadowGenerator.blurKernel = 32;
+    shadowGenerator.blurKernel = 16;
+    shadowGenerator.bias = 0.00001;
     this.shadowGenerator = shadowGenerator;
+
+    // Store lights for potential animation
+    this.lights = {
+      hemispheric: hemiLight,
+      main: this.light,
+      interior: templeInteriorLight,
+      rim: rimLight
+    };
+
+    // Subtle bloom and glow to make coins/water pop
+    try {
+      const pipeline = new BABYLON.DefaultRenderingPipeline('default', true, this.scene, [this.camera]);
+      pipeline.bloomEnabled = true;
+      pipeline.bloomThreshold = 0.7;
+      pipeline.bloomWeight = 0.4;
+      pipeline.bloomKernel = 32;
+      pipeline.imageProcessingEnabled = true;
+      pipeline.fxaaEnabled = true;
+    } catch (e) {}
+
+    // Glow layer; coins will be added to this from the asset manager
+    try {
+      const glow = new BABYLON.GlowLayer('glow', this.scene, { blurKernelSize: 64 });
+      glow.intensity = 0.6;
+      this.glowLayer = glow;
+      // expose via scene for other systems
+      this.scene.glowLayer = glow;
+    } catch (e) {}
   }
 
   /**
@@ -186,8 +238,8 @@ export class MainScene {
     pp.onApply = (effect) => {
       t += this.engine.getDeltaTime() * 0.001;
       effect.setFloat('time', t);
-      effect.setFloat('intensity', 0.08);
-      effect.setColor3('tint', new BABYLON.Color3(0.6, 0.9, 0.7));
+      effect.setFloat('intensity', 0.13);
+      effect.setColor3('tint', new BABYLON.Color3(0.4, 0.9, 0.9));
     };
 
     this.causticsPostProcess = pp;
@@ -237,9 +289,9 @@ export class MainScene {
     const tex = new BABYLON.DynamicTexture('skyGradient', { width: 512, height: 512 }, this.scene, true);
     const ctx = tex.getContext();
     const grd = ctx.createLinearGradient(0, 0, 0, 512);
-    // Top: softer misty green-blue; Bottom: slightly warmer green
-    grd.addColorStop(0, '#a6c9b0');
-    grd.addColorStop(1, '#7ea787');
+    // Teal gradient similar to Temple Run swamp
+    grd.addColorStop(0, '#2a4950');
+    grd.addColorStop(1, '#6fb2b5');
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, 512, 512);
     tex.update(false);
@@ -293,18 +345,18 @@ export class MainScene {
         float r2 = sin((vUV.x * 0.7 - time * 0.05) * 60.0) * cos((vUV.y * 0.8 + time * 0.04) * 55.0);
         float ripple = 0.5 * r1 + 0.5 * r2;
 
-        // Base swamp color
-        vec3 base = vec3(0.12, 0.25, 0.18); // deep green
-        vec3 shallow = vec3(0.20, 0.36, 0.27); // lighter green
+        // Turquoise swamp color
+        vec3 base = vec3(0.06, 0.20, 0.26);   // deep teal
+        vec3 shallow = vec3(0.10, 0.55, 0.60); // bright turquoise
         float mixAmt = 0.5 + 0.5 * ripple;
         vec3 col = mix(base, shallow, clamp(mixAmt, 0.0, 1.0));
 
         // Soft specular glint that shimmers with ripples
-        float spec = pow(max(0.0, ripple), 8.0);
-        col += vec3(0.04, 0.05, 0.04) * spec;
+        float spec = pow(max(0.0, ripple), 10.0);
+        col += vec3(0.05, 0.08, 0.10) * spec;
 
         // Slight haze to integrate with foggy scene
-        col = mix(col, vec3(0.48, 0.60, 0.52), 0.1);
+        col = mix(col, vec3(0.30, 0.50, 0.55), 0.12);
 
         gl_FragColor = vec4(col, 0.9);
       }
@@ -355,7 +407,7 @@ export class MainScene {
     if (!targetPosition) return;
     
     // Smooth camera follow
-    const cameraOffset = new BABYLON.Vector3(0, 5, -10);
+    const cameraOffset = new BABYLON.Vector3(0, 6, -14);
     const newPosition = targetPosition.add(cameraOffset);
     
     // Lerp camera position for smooth movement
@@ -366,8 +418,40 @@ export class MainScene {
     );
     
     // Update camera target
-    const targetOffset = new BABYLON.Vector3(0, 2, 5);
+    const targetOffset = new BABYLON.Vector3(0, 2.5, 7);
     this.camera.setTarget(targetPosition.add(targetOffset));
+  }
+
+  /**
+   * Smart follow that frames an entire mesh based on its bounds
+   * without changing the public updateCameraFollow API.
+   */
+  updateCameraFollowForMesh(mesh) {
+    if (!mesh) return this.updateCameraFollow(mesh?.position);
+
+    // Compute approximate height
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    const collect = typeof mesh.getChildMeshes === 'function' ? mesh.getChildMeshes(false) : [mesh];
+    for (const m of collect) {
+      if (!m.getBoundingInfo) continue;
+      m.computeWorldMatrix(true);
+      const bb = m.getBoundingInfo().boundingBox;
+      minY = Math.min(minY, bb.minimumWorld.y);
+      maxY = Math.max(maxY, bb.maximumWorld.y);
+    }
+    const height = !isFinite(minY) || !isFinite(maxY) ? 1.6 : Math.max(0.6, maxY - minY);
+
+    // Desired offsets scale with character size
+    const pos = mesh.getAbsolutePosition ? mesh.getAbsolutePosition() : mesh.position;
+    const yOff = Math.max(3.5, height * 0.9 + 1.6);
+    const zBack = Math.max(10, height * 5.5);
+    const cameraOffset = new BABYLON.Vector3(0, yOff, -zBack);
+    const targetOffset = new BABYLON.Vector3(0, Math.max(1.2, height * 0.35 + 1.0), 7);
+
+    const desired = pos.add(cameraOffset);
+    this.camera.position = BABYLON.Vector3.Lerp(this.camera.position, desired, 0.1);
+    this.camera.setTarget(pos.add(targetOffset));
   }
 
   /**
