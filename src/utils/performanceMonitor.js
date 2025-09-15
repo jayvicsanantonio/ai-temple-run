@@ -260,4 +260,26 @@ export class PerformanceMonitor {
 
     console.log(`Performance Snapshot - FPS: ${fps.toFixed(1)}, Memory: ${memUsage}`);
   }
+
+  /**
+   * Get current performance statistics
+   */
+  getStats() {
+    const fps = this.getCurrentFPS();
+    const memUsage = performance.memory ? {
+      used: performance.memory.usedJSHeapSize / 1024 / 1024,
+      total: performance.memory.totalJSHeapSize / 1024 / 1024,
+      limit: performance.memory.jsHeapSizeLimit / 1024 / 1024
+    } : null;
+
+    return {
+      fps: Math.round(fps * 10) / 10,
+      frameCount: this.frameCount,
+      memory: memUsage,
+      isMonitoring: this.isMonitoring,
+      uptime: this.startTime ? (performance.now() - this.startTime) / 1000 : 0,
+      averageFPS: this.metrics.frameRates.length > 0 ?
+        this.metrics.frameRates.reduce((a, b) => a + b, 0) / this.metrics.frameRates.length : 0
+    };
+  }
 }

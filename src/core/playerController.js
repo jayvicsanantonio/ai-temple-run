@@ -23,7 +23,7 @@ export class PlayerController {
     
     // Movement parameters
     this.forwardSpeed = 10;
-    this.baseY = 0.5;
+    this.baseY = 2.0; // Fully elevate Pikachu above the path
     this.jumpHeight = 2.5;
     this.jumpDuration = 0.8;
     this.jumpTime = 0;
@@ -52,6 +52,10 @@ export class PlayerController {
   init(mesh) {
     this.player = mesh;
     this.playerMesh = mesh;
+    if (this.player && this.player.setEnabled) {
+      // Ensure the visual is enabled in case a procedural fallback was created disabled
+      this.player.setEnabled(true);
+    }
     this.player.position = new BABYLON.Vector3(0, this.baseY, 0);
     
     // Create collision box (slightly smaller than visual)
@@ -70,8 +74,44 @@ export class PlayerController {
    * Setup animations for the player
    */
   setupAnimations() {
-    // Placeholder for animation setup
-    // Will be replaced with actual animations from Blender assets
+    // Try to locate an AnimationGroup targeting the player's skeleton
+    const groups = this.scene.animationGroups || [];
+    const playerRoot = this.player;
+    const isDescendant = (node) => {
+      let n = node;
+      while (n) {
+        if (n === playerRoot) return true;
+        n = n.parent;
+      }
+      return false;
+    };
+
+    const candidateGroups = groups.filter((g) =>
+      g.targetedAnimations && g.targetedAnimations.some((ta) => ta.target && isDescendant(ta.target))
+    );
+
+    // Prefer a group named like "Run"; fall back to first candidate
+    let runGroup = candidateGroups.find((g) => /run/i.test(g.name));
+    if (!runGroup && candidateGroups.length > 0) {
+      runGroup = candidateGroups[0];
+    }
+
+    if (runGroup) {
+      // Stop any existing to avoid duplicates
+      candidateGroups.forEach((g) => g.stop());
+      runGroup.reset();
+      runGroup.start(true); // loop
+      this.animations.run = runGroup;
+      this.currentAnimation = 'run';
+    } else {
+      // Fallback: body bob via a light up-down motion
+      this.scene.onBeforeRenderObservable.add(() => {
+        if (this.currentAnimation === 'run' && this.player) {
+          const t = performance.now() * 0.005;
+          this.player.position.y = this.baseY + Math.sin(t * 2.5) * 0.05;
+        }
+      });
+    }
   }
 
   /**
@@ -83,6 +123,11 @@ export class PlayerController {
 
     // Forward movement
     this.player.position.z += this.forwardSpeed * deltaTime;
+
+    // Tie animation speed to forward speed if possible
+    if (this.animations.run && this.animations.run.speedRatio !== undefined) {
+      this.animations.run.speedRatio = Math.min(2.0, 0.7 + this.forwardSpeed * 0.06);
+    }
 
     // Lane switching
     this.updateLanePosition(deltaTime);
